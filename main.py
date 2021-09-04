@@ -12,209 +12,478 @@
 # systems, or usage in connection with your business, if at all.
 #
 """Retrieves and removes disapproved ads for an MCC tree."""
-
 import argparse
-import sys
 import json
+import logging
+import re
+import sys
+import time
+import uuid
+from concurrent import futures
 from pathlib import Path
-from google.ads.googleads.client import GoogleAdsClient
 from google.ads.googleads.errors import GoogleAdsException
+from google.cloud import bigquery
 
-_DEFAULT_PAGE_SIZE = 1000
-_AUTO_REMOVE = False
-_SUSPENSION_TOPICS = [each_string.lower() for each_string in ['Destination not working',
-                                                              'Enabling dishonest behavior', 'Unapproved substances',
-                                                              'Guns', 'Guns, gun parts and related products',
-                                                              'Explosives', 'Other Weapons', 'Tobacco']]
-_DISAPPROVED_ADS_AUDIT = Path('./disapproved_ads.json')
+from bq_connector import BqServiceWrapper
+from gads_connector import GAdsServiceWrapper
 
+_DS_ID = "google_3_strikes"
+_ALL_ACCOUNTS_TABLE_NAME = "AllAccounts"
+_ADS_TO_REMOVE_TABLE_NAME = "AdsToRemove"
+_PER_ACCOUNT_SUMMARY_TABLE_NAME = "PerAccountSummary"
+_PER_MCC_SUMMARY_TABLE_NAME = "PerMccSummary"
 
-class ServiceWrapper:
-    """Wraps GoogleAdsService API request"""
+_REMOVE_ADS = None
+_PARALLEL_MODE = None
+_CHUNK_SIZE = 5000
+_TRIES_LEFT = 3
 
-    def __init__(self, client, customer_id):
-        self._client = client
-        self._ga_service = client.get_service("GoogleAdsService")
-        self._ad_group_ad_operation = client.get_type("AdGroupAdOperation")
-        self._ad_request_type = client.get_type("SearchGoogleAdsRequest")
-        self._customer_id = customer_id
+logging.basicConfig(level=logging.INFO, format='[%(asctime)s - %(levelname)s] %(message).5000s')
+logging.getLogger('google.ads.googleads.client').setLevel(logging.INFO)
 
-    def get_rows(self, customer_id, query):
-        request = self._ad_request_type
-        request.customer_id = customer_id
-        request.query = query
-        request.page_size = _DEFAULT_PAGE_SIZE
-        return self._ga_service.search(request=request)
+_NON_CRITICAL_TOPICS = [each_string.lower() for each_string in ['Destination', 'format']]
+_DEBUG_SUSPENSION_TOPICS = [each_string.lower() for each_string in ['Destination_not_working']]
 
-    @property
-    def ga_service(self):
-        return self._ga_service
-
-    @property
-    def ad_group_ad_operation(self):
-        return self._ad_group_ad_operation
-
-    @property
-    def ad_request_type(self):
-        return self._ad_request_type
-
-    @property
-    def customer_id(self):
-        return self._customer_id
+_NON_CRITICAL_TOPICS_FILE = './non_critical_topics.json'
+_DISAPPROVED_ADS_AUDIT_FILE_NAME = 'disapproved_ads_' + time.strftime("%Y%m%d-%H%M%S")
+_DISAPPROVED_ADS_AUDIT_FILE_PATH = Path('./' + _DISAPPROVED_ADS_AUDIT_FILE_NAME + '.json')
 
 
-def main():
+def create_bq_tables():
+    bqServiceWrapper.create_table(_ALL_ACCOUNTS_TABLE_NAME,
+                                  [
+                                      bigquery.SchemaField("account_id", "STRING", mode="REQUIRED"),
+                                      bigquery.SchemaField("hierarchy", "STRING", mode="REQUIRED"),
+                                      bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
+                                      bigquery.SchemaField("session_id", "string", mode="REQUIRED")
+                                  ])
+    bqServiceWrapper.create_table(_ADS_TO_REMOVE_TABLE_NAME,
+                                  [
+                                      bigquery.SchemaField("ad_id", "STRING", mode="REQUIRED"),
+                                      bigquery.SchemaField("ad_type", "STRING", mode="REQUIRED"),
+                                      bigquery.SchemaField("ad_group_id", "STRING", mode="REQUIRED"),
+                                      bigquery.SchemaField("campaign_id", "STRING", mode="REQUIRED"),
+                                      bigquery.SchemaField("hierarchy", "STRING", mode="REQUIRED"),
+                                      bigquery.SchemaField("final_urls", "STRING", mode="REQUIRED"),
+                                      bigquery.SchemaField("policy_topics", "STRING", mode="REQUIRED"),
+                                      bigquery.SchemaField("mandatory_data", "STRING", mode="REQUIRED"),
+                                      bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
+                                      bigquery.SchemaField("status", "string", mode="NULLABLE"),
+                                      bigquery.SchemaField("customer_id", "string", mode="NULLABLE"),
+                                      bigquery.SchemaField("session_id", "string", mode="REQUIRED"),
+                                      bigquery.SchemaField("removal_error", "string", mode="NULLABLE")
+                                  ])
+    bqServiceWrapper.create_table(_PER_ACCOUNT_SUMMARY_TABLE_NAME,
+                                  [
+                                      bigquery.SchemaField("account_id", "STRING", mode="REQUIRED"),
+                                      bigquery.SchemaField("disapproved_ads_count", "INTEGER", mode="REQUIRED"),
+                                      bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
+                                      bigquery.SchemaField("session_id", "string", mode="REQUIRED")
+                                  ])
+
+    bqServiceWrapper.create_table(_PER_MCC_SUMMARY_TABLE_NAME,
+                                  [
+                                      bigquery.SchemaField("account_id", "STRING", mode="REQUIRED"),
+                                      bigquery.SchemaField("total_sub_accounts", "INTEGER", mode="REQUIRED"),
+                                      bigquery.SchemaField("top_mcc_total_removed_ads", "INTEGER", mode="REQUIRED"),
+                                      bigquery.SchemaField("accounts_with_removed_ads", "INTEGER", mode="REQUIRED"),
+                                      bigquery.SchemaField("accounts_without_removed_ads", "INTEGER", mode="REQUIRED"),
+                                      bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
+                                      bigquery.SchemaField("session_id", "string", mode="REQUIRED")
+                                  ])
+
+
+def main(top_id):
     accounts_with_removed_ads = 0
     accounts_without_removed_ads = 0
-    total_removed_ads = 0
-    accounts = flat_all_accounts(serviceWrapper.customer_id, str(serviceWrapper.customer_id))
-    for account in accounts:
-        removed_ads_count = remove_disapproved_ads_for_account(account["id"])
-        total_removed_ads += removed_ads_count
-        if removed_ads_count > 0:
-            accounts_with_removed_ads += 1
-        else:
-            accounts_without_removed_ads += 1
-    print(f"\naccountsWithRemovedAds = %s, accountsWithoutRemovedAds = %s, totalRemovedAds = %s",
-          str(accounts_with_removed_ads), str(accounts_without_removed_ads), str(total_removed_ads))
+    top_mcc_total_removed_ads = 0
+    create_bq_tables()
+    accounts = flat_all_accounts(top_id, str(top_id))
+    bqServiceWrapper.upload_rows_to_bq(table_id=_ALL_ACCOUNTS_TABLE_NAME, rows_to_insert=accounts)
+    if _PARALLEL_MODE:
+        with futures.ThreadPoolExecutor() as executor:
+            results = executor.map(
+                lambda account_item: remove_disapproved_ads_for_account(account_item),
+                accounts)
+        for removed_ads_count in results:
+            top_mcc_total_removed_ads += removed_ads_count
+            if removed_ads_count > 0:
+                accounts_with_removed_ads += 1
+            else:
+                accounts_without_removed_ads += 1
+    else:
+        for account in accounts:
+            removed_ads_count = remove_disapproved_ads_for_account(account)
+            if removed_ads_count > 0:
+                accounts_with_removed_ads += 1
+            else:
+                accounts_without_removed_ads += 1
+    print(
+        f"\ntop_mcc_total_accounts = {accounts_with_removed_ads + accounts_without_removed_ads}, "
+        f"accounts_with_removed_ads = {accounts_with_removed_ads}, "
+        f"accounts_without_removed_ads = {accounts_without_removed_ads}, "
+        f"top_mcc_total_removed_ads = {top_mcc_total_removed_ads}")
+    bqServiceWrapper.upload_rows_to_bq(
+        table_id=_PER_ACCOUNT_SUMMARY_TABLE_NAME,
+        rows_to_insert=[add_session_identifiers_bq_columns({"account_id": top_id,
+                                                            "accounts_with_removed_ads": accounts_with_removed_ads,
+                                                            "accounts_without_removed_ads":
+                                                                accounts_without_removed_ads,
+                                                            "top_mcc_total_removed_ads": top_mcc_total_removed_ads})])
 
 
 def flat_all_accounts(customer_id, hierarchy):
     """Returns a list {id, hierarchy} for all the descendant accounts of a given MCC account"""
-    accounts = get_sub_accounts(False, customer_id, hierarchy)
-    accounts.append({"id": customer_id, "hierarchy": hierarchy})
-    sub_mccs = get_sub_accounts(True, customer_id, hierarchy)
+    accounts = gAdsServiceWrapper.get_sub_accounts(False, customer_id, hierarchy)
+    accounts.append({"account_id": customer_id, "hierarchy": hierarchy})
+    sub_mccs = gAdsServiceWrapper.get_sub_accounts(True, customer_id, hierarchy)
     if len(sub_mccs) > 0:
         for sub_mcc in sub_mccs:
-            accounts = accounts + flat_all_accounts(sub_mcc["id"], sub_mcc["hierarchy"])
-    return accounts
+            accounts = accounts + flat_all_accounts(sub_mcc["account_id"], sub_mcc["hierarchy"])
+    return [add_session_identifiers_bq_columns(account) for account in accounts]
 
 
-def get_sub_accounts(is_mcc, customer_id, hierarchy):
-    """Returns a list {id, hierarchy} for all the descendant accounts of a given MCC account
-    which are mcc themselves = {is_mcc} """
-    query = '''
-    SELECT
-      customer_client.descriptive_name,
-      customer_client.id
-    FROM
-      customer_client
-    WHERE
-      customer_client.manager = ''' + str(is_mcc)
-
-    accounts = []
-    rows = serviceWrapper.get_rows(customer_id, query)
-    for row in rows:
-        customer_id_str = str(row.customer_client.id)
-        if not customer_id_str == customer_id:
-            accounts.append({"id": customer_id_str, "hierarchy": hierarchy + '_' +customer_id_str})
-    return accounts
-
-
-def remove_disapproved_ads_for_account(customer_id):
+def remove_disapproved_ads_for_account(account):
     """Remove all disapproved ads for a given customer id"""
-    query = f"""
-        SELECT
-          customer.id,
-          campaign.id,
-          ad_group_ad.ad.id,
-          ad_group_ad.ad.type,
-          ad_group_ad.policy_summary.approval_status,
-          ad_group_ad.policy_summary.policy_topic_entries
-        FROM ad_group_ad
-        WHERE
-            ad_group_ad.policy_summary.approval_status = DISAPPROVED"""
-
-    rows = serviceWrapper.get_rows(customer_id, query)
+    customer_id = account["account_id"]
+    ad_removal_operations = []
+    ads_to_be_removed_json = []
+    rows = gAdsServiceWrapper.get_disapproved_ads_for_account(customer_id)
     disapproved_ads_count = 0
-    print("Disapproved ads:")
+    print(f"\nProcessing Account id: {customer_id} =============")
 
-    # Iterate over all ads in all rows returned and count disapproved ads.
-    for row in rows:
-        ad_group_ad = row.ad_group_ad
-        ad = ad_group_ad.ad
-        policy_summary = ad_group_ad.policy_summary
+    for batch in rows:
+        for row in batch.results:
+            ad_group_ad = row.ad_group_ad
+            campaign_id = row.campaign.id
+            ad = ad_group_ad.ad
+            policy_summary = ad_group_ad.policy_summary
+            current_topics = [entry.topic.lower() for entry in policy_summary.policy_topic_entries]
+            if does_contain_critical_topics(current_topics, _NON_CRITICAL_TOPICS):
+                disapproved_ads_count += 1
+                print(f'** A suspension topic, will be removed')
+                print(f'\ttopics: "{current_topics}"')
+                ad_json = get_ad_hierarchy(account, campaign_id, ad_group_ad, ad)
+                ad_json["policy_topics"] = str(current_topics)
+                ad_json["evidences"] = str(get_policy_extra(policy_summary))
+                populate_ad_json_full_details(ad_json, ad_group_ad, ad)
+                ads_to_be_removed_json.append(ad_json)
+                if _REMOVE_ADS:
+                    ad_removal_operations.append(
+                        build_ad_removal_sync_operation(customer_id, ad_json["ad_group_id"], row.ad_group_ad.ad.id))
 
-        print(
-            f'Ad with ID "{ad.id}" and type "{ad.type_.name}" was '
-            "disapproved with the following policy topic entries:"
-        )
-
-        # Display the policy topic entries related to the ad disapproval.
-        for entry in policy_summary.policy_topic_entries:
-            print(f'\ttopic: "{entry.topic}", type "{entry.type_.name}"')
-            # Display the attributes and values that triggered the policy topic.
-            for evidence in entry.evidences:
-                for index, text in enumerate(evidence.text_list.texts):
-                    print(f"\t\tevidence text[{index}]: {text}")
-                    if entry.topic.lower() in _SUSPENSION_TOPICS:
-                        disapproved_ads_count += 1
-                        if _AUTO_REMOVE:
-                            remove_ad(customer_id, ad_group_ad.ad_group.id, ad_group_ad.ad.id)
-
-    print(f"\nNumber of relevant disapproved ads found: ", str(disapproved_ads_count))
+    if len(ad_removal_operations) > 0:
+        ads_to_be_removed_json = audit_ads_before_remove(ads_to_be_removed_json)
+        remove_ads(ad_removal_operations, ads_to_be_removed_json, customer_id)
+    audit_ads_after_remove(customer_id, disapproved_ads_count)
     return disapproved_ads_count
 
-    # with open(_DISAPPROVED_ADS_AUDIT, 'w') as f:
-    #    json.dump(account_label_map, f, indent=2)
-    # print('Json audit updated.')
 
-def remove_ad(customer_id, ad_group_id, ad_id):
-    """Removes the specified ad"""
-    resource_name = serviceWrapper.ga_service.ad_group_ad_path(
-        customer_id, ad_group_id, ad_id
-    )
-    serviceWrapper.ad_group_ad_operation.remove = resource_name
+def add_session_identifiers_bq_columns(item):
+    item["timestamp"] = "AUTO"
+    item["session_id"] = current_session_id
+    return item
 
-    ad_group_ad_response = serviceWrapper.ga_service.mutate_ad_group_ads(
-        customer_id=customer_id, operations=[serviceWrapper.ad_group_ad_operation]
-    )
 
+def add_bq_columns_to_ad(ad_removal_item, status):
+    ad_removal_item["status"] = status
+    add_session_identifiers_bq_columns(ad_removal_item)
+    return ad_removal_item
+
+
+def audit_ads_after_remove(account_id, disapproved_ads_count):
     print(
-        f"Removed ad group ad {ad_group_ad_response.results[0].resource_name}."
-    )
+        f"\nAccount-id: {account_id} ============= Finished Processing. # relevant disapproved ads found: "
+        f"{str(disapproved_ads_count)}")
+    bqServiceWrapper.upload_rows_to_bq(
+        table_id=_PER_ACCOUNT_SUMMARY_TABLE_NAME, rows_to_insert=[add_session_identifiers_bq_columns({"account_id": account_id,
+                                                                   "disapproved_ads_count": disapproved_ads_count})])
 
 
-if __name__ == "__main__":
-    """ GoogleAdsClient will read the google-ads.yaml configuration file in the
-     home directory if none is specified. """
-google_ads_client = GoogleAdsClient.load_from_storage('./google-ads.yaml')
-parser = argparse.ArgumentParser(
-    description=(
-        "Lists disapproved ads for a given top MCC"
-    )
-)
-# The following argument(s) should be provided to run the example.
-parser.add_argument(
-    "-id",
-    "--top_id",
-    type=str,
-    required=True,
-    help="The Google Ads top mcc ID.",
-)
-parser.add_argument(
-    "-rm",
-    "--remove_ads",
-    type=str,
-    required=False,
-    help="Should remove disapproved ads. Default: false",
-)
-args = parser.parse_args()
-if args.remove_ads is not None:
-    AUTO_REMOVE = args.remove_ads
+def audit_ads_before_remove(ads_to_be_removed_json):
+    ads_to_be_removed_json = [add_bq_columns_to_ad(ad_removal_item, None)
+                              for ad_removal_item in ads_to_be_removed_json]
+    with open(Path(_DISAPPROVED_ADS_AUDIT_FILE_PATH), 'a') as f:
+        f.write("\n" + json.dumps(ads_to_be_removed_json))
+    bqServiceWrapper.upload_rows_to_bq(table_id=_ADS_TO_REMOVE_TABLE_NAME, rows_to_insert=ads_to_be_removed_json)
+    return ads_to_be_removed_json
 
-try:
-    serviceWrapper = ServiceWrapper(google_ads_client, args.top_id)
-    main()
-except GoogleAdsException as ex:
+
+def get_policy_extra(policy_summary):
+    evidence_array = []
+    # Display the policy topic entries related to the ad disapproval.
+    for entry in policy_summary.policy_topic_entries:
+        print(f'\ttopic: "{entry.topic}", type "{entry.type_.name}"')
+        # Display the attributes and values that triggered the policy
+        # topic.
+        evidence_array_per_entry = []
+        for evidence in entry.evidences:
+            for index, text in enumerate(evidence.text_list.texts):
+                evidence_array_per_entry.append(f"\t\tevidence text[{index}]: {text}")
+        evidence_array.append(
+            {"topic": entry.topic, "type": entry.type_.name, "array": evidence_array_per_entry})
+    return evidence_array
+
+
+def populate_errors(failed_items, error_array):
+    for index, item in enumerate(failed_items):
+        item["removal_error"] = error_array[index]
+
+
+def remove_ads(removal_operations, removal_json, customer_id):
+    operations_chucks = split(removal_operations, _CHUNK_SIZE)
+    json_chunks = split(removal_json, _CHUNK_SIZE)
+    for chunk_index, operations_chuck in enumerate(operations_chucks):
+        try:
+            chunk_reponse = send_bulk_mutate_request(customer_id, operations_chuck)
+        except GoogleAdsException as ex:
+            handle_googleads_exception(ex)
+        else:
+            # Remove succeeded
+            index_array, error_array = _print_results(chunk_reponse)
+            current_json_chunk = json_chunks[chunk_index]
+            failed_items = take_out_multiple_element(current_json_chunk, index_array)
+
+            current_json_chunk = [add_bq_columns_to_ad(removal_item, "Removed") for removal_item in current_json_chunk]
+            bqServiceWrapper.update_bq_ads_status("Remove", table_id=_ADS_TO_REMOVE_TABLE_NAME,
+                                                  update_ads=current_json_chunk)
+
+            failed_items = [add_bq_columns_to_ad(removal_item, "Failed") for removal_item in failed_items]
+            populate_errors(failed_items, error_array)
+            bqServiceWrapper.update_bq_ads_status("Failed_removal",  table_id=_ADS_TO_REMOVE_TABLE_NAME,
+                                                  update_ads= failed_items)
+
+
+def take_out_multiple_element(list_object, indices):
+    removed_elements = []
+    indices = sorted(indices, reverse=True)
+    for idx in indices:
+        if idx < len(list_object):
+            removed_elements.append(list_object.pop(idx))
+
+def get_ad_hierarchy(account, campaign_id, ad_group_ad, ad):
+    m = re.match(r"customers/(\w+)/adGroups/(\w+)", ad_group_ad.ad_group)
+    if m is not None:
+        ad_group_id = m.group(2)
+    else:
+        ad_group_id = ad_group_ad.ad_group
+    return {"hierarchy": account["hierarchy"],
+            "customer_id": account["account_id"],
+            "campaign_id": campaign_id,
+            "ad_group_id": ad_group_id,
+            "ad_id": ad.id,
+            "ad_type": ad.type_.name,
+            "final_urls": ', '.join(ad_group_ad.ad.final_urls)}
+
+
+def populate_ad_json_full_details(ad_json, ad_group_ad, ad):
+    mandatory_data = {}
+    if ad.type_.name.upper() == "TEXT_AD":
+        mandatory_data = {
+            "ad.text_ad.headline": ad.text_ad.headline,
+            "desc1": ad.text_ad.description1,
+            "desc2": ad.text_ad.description2}
+    elif ad.type_.name.upper() == "EXPANDED_TEXT_AD":
+        mandatory_data = {
+            'ad_group_ad.ad.expanded_text_ad.description': ad_group_ad.ad.expanded_text_ad.description,
+            'ad_group_ad.ad.expanded_text_ad.description2': ad_group_ad.ad.expanded_text_ad.description2,
+            'ad_group_ad.ad.expanded_text_ad.headline_part1': ad_group_ad.ad.expanded_text_ad.headline_part1,
+            'ad_group_ad.ad.expanded_text_ad.headline_part2': ad_group_ad.ad.expanded_text_ad.headline_part2,
+            'ad_group_ad.ad.expanded_text_ad.headline_part3': ad_group_ad.ad.expanded_text_ad.headline_part3}
+    elif ad.type_.name.upper() == "RESPONSIVE_SEARCH_AD":
+        mandatory_data = {
+            "ad_group_ad.ad.responsive_search_ad.headlines": extract_text_from_proto(
+                ad_group_ad.ad.responsive_search_ad.headlines),
+            "ad_group_ad.ad.responsive_search_ad.descriptions": extract_text_from_proto(
+                ad_group_ad.ad.responsive_search_ad.descriptions),
+            "ad_group_ad.ad.responsive_search_ad.path1": ad_group_ad.ad.responsive_search_ad.path1,
+            "ad_group_ad.ad.responsive_search_ad.path2": ad_group_ad.ad.responsive_search_ad.path2}
+    else:
+        print(ad.type_.name.upper())
+    ad_json["mandatory_data"] = str(mandatory_data)
+
+
+def extract_text_from_proto(proto_list):
+    values = []
+    for item in proto_list:
+        if item.pinned_field:
+            values.append("%s: %s" % (item.pinned_field, item.text))
+        else:
+            values.append("%s" % item.text)
+    return values
+
+
+def extract_regex_from_proto(regex, proto):
+    return re.findall(regex, str(proto))
+
+
+def load_non_critical_topics():
+    with open(_NON_CRITICAL_TOPICS_FILE) as f:
+        _NON_CRITICAL_TOPICS = json.load(f)["list"]
+        print(_NON_CRITICAL_TOPICS)
+
+
+def does_contain_critical_topics(current_topics, non_crucial_list):
+    for current_topic in current_topics:
+        if is_topic_critical(current_topic, non_crucial_list):
+            return True
+    return False
+
+
+def is_topic_critical(current_topic, non_crucial_list):
+    for non_crucial in non_crucial_list:
+        if non_crucial in current_topic:
+            return False
+    return True
+
+
+def build_ad_removal_sync_operation(customer_id, ad_group_id, ad_id):
+    resource_name = gAdsServiceWrapper.ad_group_ad_service.ad_group_ad_path(customer_id, ad_group_id, ad_id)
+    ad_group_ad_op1 = gAdsServiceWrapper.client.get_type("AdGroupAdOperation")
+    ad_group_ad_op1.remove = resource_name
+    return ad_group_ad_op1
+
+
+def send_bulk_mutate_request(customer_id, operations):
+    # Issue a mutate request, setting partial_failure=True.
+    request = gAdsServiceWrapper.client.get_type("MutateAdGroupAdsRequest")
+    request.customer_id = customer_id
+    request.operations = operations
+    request.partial_failure = True
+    return gAdsServiceWrapper.ad_group_ad_service.mutate_ad_group_ads(request=request)
+
+
+# [START handle_partial_failure_1]
+def _is_partial_failure_error_present(response):
+    """Checks whether a response message has a partial failure error.
+    Args:
+        response:  A MutateAdGroupsResponse message instance.
+    Returns: A boolean, whether or not the response message has a partial
+        failure error.
+    """
+    partial_failure = getattr(response, "partial_failure_error", None)
+    code = getattr(partial_failure, "code", None)
+    return code != 0
+    # [END handle_partial_failure_1]
+
+
+# [START handle_partial_failure_2]
+def _print_results(response):
+    """Prints partial failure errors and success messages from a response.
+    Args:
+        response: a MutateAdGroupsResponse instance.
+    """
+    index_array = []
+    error_array = []
+
+    # Check for existence of any partial failures in the response.
+    if _is_partial_failure_error_present(response):
+        print("Partial failures occurred. Details will be shown below.\n")
+        # Prints the details of the partial failure errors.
+        partial_failure = getattr(response, "partial_failure_error", None)
+        # partial_failure_error.details is a repeated field and iterable
+        error_details = getattr(partial_failure, "details", [])
+
+        for error_detail in error_details:
+            # Retrieve an instance of the GoogleAdsFailure class from the client
+            failure_message = gAdsServiceWrapper.client.get_type("GoogleAdsFailure")
+            # Parse the string into a GoogleAdsFailure message instance.
+            # To access class-only methods on the message we retrieve its type.
+            GoogleAdsFailure = type(failure_message)
+            failure_object = GoogleAdsFailure.deserialize(error_detail.value)
+
+            for error in failure_object.errors:
+                # Construct and print a string that details which element in
+                # the above ad_group_operations list failed (by index number)
+                # as well as the error message and error code.
+                print(
+                    "A partial failure at index "
+                    f"{error.location.field_path_elements[0].index} occurred "
+                    f"\nError message: {error.message}\nError code: "
+                    f"{error.error_code}"
+                )
+                index_array.append(error.location.field_path_elements[0].index)
+                error_array.append({"error_message": error.message, "error_code":error.error_code})
+    else:
+        print(
+            "All operations completed successfully. No partial failure "
+            "to show."
+        )
+
+    # In the list of results, operations from the ad_group_operation list
+    # that failed will be represented as empty messages. This loop detects
+    # such empty messages and ignores them, while printing information about
+    # successful operations.
+    for message in response.results:
+        if not message:
+            continue
+        print(f"Removed ad group ad with resource_name: {message.resource_name}.")
+
+    return index_array, error_array
+
+def handle_googleads_exception(exception):
+    """Prints the details of a GoogleAdsException object.
+    Args:
+        exception: an instance of GoogleAdsException.
+    """
     print(
-        f'Request with ID "{ex.request_id}" failed with status '
-        f'"{ex.error.code().name}" and includes the following errors:'
+        f'Request with ID "{exception.request_id}" failed with status '
+        f'"{exception.error.code().name}" and includes the following errors:'
     )
-    for error in ex.failure.errors:
+    for error in exception.failure.errors:
         print(f'\tError with message "{error.message}".')
         if error.location:
             for field_path_element in error.location.field_path_elements:
                 print(f"\t\tOn field: {field_path_element.field_name}")
     sys.exit(1)
 
+
+def split(arr, size):
+    arrays = []
+    while len(arr) > size:
+        pice = arr[:size]
+        arrays.append(pice)
+        arr = arr[size:]
+    arrays.append(arr)
+    return arrays
+
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(
+        description=(
+            "Lists disapproved ads for a given top MCC"
+        )
+    )
+    parser.add_argument(
+        "-id",
+        "--top_id",
+        type=str,
+        required=True,
+        help="The Google Ads top mcc ID.",
+    )
+    parser.add_argument(
+        "-p",
+        "--parallel",
+        action="store_true",
+        help="Runs multiple accounts in parallel.",
+    )
+    parser.add_argument(
+        "-rm",
+        "--remove_ads",
+        action="store_true",
+        help="Should remove disapproved ads.",
+    )
+    args = parser.parse_args()
+    _REMOVE_ADS = args.remove_ads
+    _PARALLEL_MODE = args.parallel
+    load_non_critical_topics()
+    current_session_id = str(uuid.uuid4())
+    while _TRIES_LEFT > 0:
+        _TRIES_LEFT -= 1
+        try:
+            gAdsServiceWrapper = GAdsServiceWrapper(args.top_id)
+            bqServiceWrapper = BqServiceWrapper(_DS_ID)
+            main(args.top_id)
+            sys.exit(0)
+        except GoogleAdsException as ex:
+            handle_googleads_exception(ex)

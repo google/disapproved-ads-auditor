@@ -1,0 +1,4 @@
+runtime: python39 # or another supported version
+
+env_variables
+  GOOGLE_APPLICATION_CREDENTIALS: "./pva-demo.json"

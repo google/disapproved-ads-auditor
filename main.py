@@ -24,6 +24,7 @@ from pathlib import Path
 from google.ads.googleads.errors import GoogleAdsException
 from google.cloud import bigquery
 
+from array_utils import split, take_out_elements
 from bq_connector import BqServiceWrapper
 from gads_connector import GAdsServiceWrapper
 
@@ -46,7 +47,7 @@ _DEBUG_SUSPENSION_TOPICS = [each_string.lower() for each_string in ['Destination
 
 _NON_CRITICAL_TOPICS_FILE = './non_critical_topics.json'
 _DISAPPROVED_ADS_AUDIT_FILE_NAME = 'disapproved_ads_' + time.strftime("%Y%m%d-%H%M%S")
-_DISAPPROVED_ADS_AUDIT_FILE_PATH = Path('./' + _DISAPPROVED_ADS_AUDIT_FILE_NAME + '.json')
+_DISAPPROVED_ADS_AUDIT_FILE_PATH = Path('./results/' + _DISAPPROVED_ADS_AUDIT_FILE_NAME + '.json')
 
 
 def create_bq_tables():
@@ -66,6 +67,7 @@ def create_bq_tables():
                                       bigquery.SchemaField("hierarchy", "STRING", mode="REQUIRED"),
                                       bigquery.SchemaField("final_urls", "STRING", mode="REQUIRED"),
                                       bigquery.SchemaField("policy_topics", "STRING", mode="REQUIRED"),
+                                      bigquery.SchemaField("evidences", "STRING", mode="REQUIRED"),
                                       bigquery.SchemaField("mandatory_data", "STRING", mode="REQUIRED"),
                                       bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
                                       bigquery.SchemaField("status", "string", mode="NULLABLE"),
@@ -76,7 +78,7 @@ def create_bq_tables():
     bqServiceWrapper.create_table(_PER_ACCOUNT_SUMMARY_TABLE_NAME,
                                   [
                                       bigquery.SchemaField("account_id", "STRING", mode="REQUIRED"),
-                                      bigquery.SchemaField("disapproved_ads_count", "INTEGER", mode="REQUIRED"),
+                                      bigquery.SchemaField("ads_to_remove_count", "INTEGER", mode="REQUIRED"),
                                       bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
                                       bigquery.SchemaField("session_id", "string", mode="REQUIRED")
                                   ])
@@ -85,9 +87,10 @@ def create_bq_tables():
                                   [
                                       bigquery.SchemaField("account_id", "STRING", mode="REQUIRED"),
                                       bigquery.SchemaField("total_sub_accounts", "INTEGER", mode="REQUIRED"),
-                                      bigquery.SchemaField("top_mcc_total_removed_ads", "INTEGER", mode="REQUIRED"),
-                                      bigquery.SchemaField("accounts_with_removed_ads", "INTEGER", mode="REQUIRED"),
-                                      bigquery.SchemaField("accounts_without_removed_ads", "INTEGER", mode="REQUIRED"),
+                                      bigquery.SchemaField("top_mcc_total_ads_to_remove", "INTEGER", mode="REQUIRED"),
+                                      bigquery.SchemaField("accounts_with_ads_to_remove", "INTEGER", mode="REQUIRED"),
+                                      bigquery.SchemaField("accounts_without_ads_to_remove", "INTEGER",
+                                                           mode="REQUIRED"),
                                       bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
                                       bigquery.SchemaField("session_id", "string", mode="REQUIRED")
                                   ])
@@ -124,12 +127,13 @@ def main(top_id):
         f"accounts_without_removed_ads = {accounts_without_removed_ads}, "
         f"top_mcc_total_removed_ads = {top_mcc_total_removed_ads}")
     bqServiceWrapper.upload_rows_to_bq(
-        table_id=_PER_ACCOUNT_SUMMARY_TABLE_NAME,
+        table_id=_PER_MCC_SUMMARY_TABLE_NAME,
         rows_to_insert=[add_session_identifiers_bq_columns({"account_id": top_id,
-                                                            "accounts_with_removed_ads": accounts_with_removed_ads,
-                                                            "accounts_without_removed_ads":
+                                                            "accounts_with_ads_to_remove": accounts_with_removed_ads,
+                                                            "accounts_without_ads_to_remove":
                                                                 accounts_without_removed_ads,
-                                                            "top_mcc_total_removed_ads": top_mcc_total_removed_ads})])
+                                                            "top_mcc_total_ads_to_remove": top_mcc_total_removed_ads,
+                                                            "total_sub_accounts": accounts_with_removed_ads + accounts_without_removed_ads})])
 
 
 def flat_all_accounts(customer_id, hierarchy):
@@ -147,9 +151,9 @@ def remove_disapproved_ads_for_account(account):
     """Remove all disapproved ads for a given customer id"""
     customer_id = account["account_id"]
     ad_removal_operations = []
-    ads_to_be_removed_json = []
+    ads_to_remove_json = []
     rows = gAdsServiceWrapper.get_disapproved_ads_for_account(customer_id)
-    disapproved_ads_count = 0
+    ads_to_remove_count = 0
     print(f"\nProcessing Account id: {customer_id} =============")
 
     for batch in rows:
@@ -160,23 +164,24 @@ def remove_disapproved_ads_for_account(account):
             policy_summary = ad_group_ad.policy_summary
             current_topics = [entry.topic.lower() for entry in policy_summary.policy_topic_entries]
             if does_contain_critical_topics(current_topics, _NON_CRITICAL_TOPICS):
-                disapproved_ads_count += 1
+                ads_to_remove_count += 1
                 print(f'** A suspension topic, will be removed')
                 print(f'\ttopics: "{current_topics}"')
                 ad_json = get_ad_hierarchy(account, campaign_id, ad_group_ad, ad)
                 ad_json["policy_topics"] = str(current_topics)
                 ad_json["evidences"] = str(get_policy_extra(policy_summary))
                 populate_ad_json_full_details(ad_json, ad_group_ad, ad)
-                ads_to_be_removed_json.append(ad_json)
+                ads_to_remove_json.append(ad_json)
                 if _REMOVE_ADS:
                     ad_removal_operations.append(
                         build_ad_removal_sync_operation(customer_id, ad_json["ad_group_id"], row.ad_group_ad.ad.id))
 
+    if len(ads_to_remove_json) > 0:
+        ads_to_remove_json = audit_ads_before_remove(ads_to_remove_json)
     if len(ad_removal_operations) > 0:
-        ads_to_be_removed_json = audit_ads_before_remove(ads_to_be_removed_json)
-        remove_ads(ad_removal_operations, ads_to_be_removed_json, customer_id)
-    audit_ads_after_remove(customer_id, disapproved_ads_count)
-    return disapproved_ads_count
+        remove_ads(ad_removal_operations, ads_to_remove_json, customer_id)
+    audit_ads_after_remove(customer_id, ads_to_remove_count)
+    return ads_to_remove_count
 
 
 def add_session_identifiers_bq_columns(item):
@@ -191,13 +196,14 @@ def add_bq_columns_to_ad(ad_removal_item, status):
     return ad_removal_item
 
 
-def audit_ads_after_remove(account_id, disapproved_ads_count):
+def audit_ads_after_remove(account_id, ads_to_remove_count):
     print(
         f"\nAccount-id: {account_id} ============= Finished Processing. # relevant disapproved ads found: "
-        f"{str(disapproved_ads_count)}")
+        f"{str(ads_to_remove_count)}")
     bqServiceWrapper.upload_rows_to_bq(
-        table_id=_PER_ACCOUNT_SUMMARY_TABLE_NAME, rows_to_insert=[add_session_identifiers_bq_columns({"account_id": account_id,
-                                                                   "disapproved_ads_count": disapproved_ads_count})])
+        table_id=_PER_ACCOUNT_SUMMARY_TABLE_NAME,
+        rows_to_insert=[add_session_identifiers_bq_columns({"account_id": account_id,
+                                                            "ads_to_remove_count": ads_to_remove_count})])
 
 
 def audit_ads_before_remove(ads_to_be_removed_json):
@@ -225,9 +231,9 @@ def get_policy_extra(policy_summary):
     return evidence_array
 
 
-def populate_errors(failed_items, error_array):
-    for index, item in enumerate(failed_items):
-        item["removal_error"] = error_array[index]
+def populate_errors(failed_items, errors):
+    for item, error in zip(failed_items, errors):
+        item["removal_error"] = error
 
 
 def remove_ads(removal_operations, removal_json, customer_id):
@@ -241,25 +247,16 @@ def remove_ads(removal_operations, removal_json, customer_id):
         else:
             # Remove succeeded
             index_array, error_array = _print_results(chunk_reponse)
-            current_json_chunk = json_chunks[chunk_index]
-            failed_items = take_out_multiple_element(current_json_chunk, index_array)
+            removed_items = json_chunks[chunk_index]
+            failed_items = take_out_elements(removed_items, index_array)
 
-            current_json_chunk = [add_bq_columns_to_ad(removal_item, "Removed") for removal_item in current_json_chunk]
-            bqServiceWrapper.update_bq_ads_status("Remove", table_id=_ADS_TO_REMOVE_TABLE_NAME,
-                                                  update_ads=current_json_chunk)
+            bqServiceWrapper.update_bq_ads_status_removed(table_id=_ADS_TO_REMOVE_TABLE_NAME,
+                                                          update_ads=removed_items)
 
-            failed_items = [add_bq_columns_to_ad(removal_item, "Failed") for removal_item in failed_items]
             populate_errors(failed_items, error_array)
-            bqServiceWrapper.update_bq_ads_status("Failed_removal",  table_id=_ADS_TO_REMOVE_TABLE_NAME,
-                                                  update_ads= failed_items)
+            bqServiceWrapper.update_bq_ads_status_failed(table_id=_ADS_TO_REMOVE_TABLE_NAME,
+                                                         update_ads=failed_items)
 
-
-def take_out_multiple_element(list_object, indices):
-    removed_elements = []
-    indices = sorted(indices, reverse=True)
-    for idx in indices:
-        if idx < len(list_object):
-            removed_elements.append(list_object.pop(idx))
 
 def get_ad_hierarchy(account, campaign_id, ad_group_ad, ad):
     m = re.match(r"customers/(\w+)/adGroups/(\w+)", ad_group_ad.ad_group)
@@ -403,7 +400,7 @@ def _print_results(response):
                     f"{error.error_code}"
                 )
                 index_array.append(error.location.field_path_elements[0].index)
-                error_array.append({"error_message": error.message, "error_code":error.error_code})
+                error_array.append({"error_message": error.message, "error_code": error.error_code})
     else:
         print(
             "All operations completed successfully. No partial failure "
@@ -420,6 +417,7 @@ def _print_results(response):
         print(f"Removed ad group ad with resource_name: {message.resource_name}.")
 
     return index_array, error_array
+
 
 def handle_googleads_exception(exception):
     """Prints the details of a GoogleAdsException object.
@@ -438,14 +436,11 @@ def handle_googleads_exception(exception):
     sys.exit(1)
 
 
-def split(arr, size):
-    arrays = []
-    while len(arr) > size:
-        pice = arr[:size]
-        arrays.append(pice)
-        arr = arr[size:]
-    arrays.append(arr)
-    return arrays
+def delete_tables():
+    bqServiceWrapper.delete_table(_PER_MCC_SUMMARY_TABLE_NAME)
+    bqServiceWrapper.delete_table(_ADS_TO_REMOVE_TABLE_NAME)
+    bqServiceWrapper.delete_table(_ALL_ACCOUNTS_TABLE_NAME)
+    bqServiceWrapper.delete_table(_PER_ACCOUNT_SUMMARY_TABLE_NAME)
 
 
 if __name__ == "__main__":
@@ -473,6 +468,12 @@ if __name__ == "__main__":
         action="store_true",
         help="Should remove disapproved ads.",
     )
+    parser.add_argument(
+        "-ddb",
+        "--delete_db",
+        action="store_true",
+        help="Delete DB tables.",
+    )
     args = parser.parse_args()
     _REMOVE_ADS = args.remove_ads
     _PARALLEL_MODE = args.parallel
@@ -481,8 +482,11 @@ if __name__ == "__main__":
     while _TRIES_LEFT > 0:
         _TRIES_LEFT -= 1
         try:
-            gAdsServiceWrapper = GAdsServiceWrapper(args.top_id)
             bqServiceWrapper = BqServiceWrapper(_DS_ID)
+            if args.delete_db:
+                delete_tables()
+                sys.exit(0)
+            gAdsServiceWrapper = GAdsServiceWrapper(args.top_id)
             main(args.top_id)
             sys.exit(0)
         except GoogleAdsException as ex:

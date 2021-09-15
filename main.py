@@ -20,9 +20,9 @@ import sys
 import time
 import uuid
 from concurrent import futures
-from pathlib import Path
 from google.ads.googleads.errors import GoogleAdsException
 from google.cloud import bigquery
+from pathlib import Path
 
 from array_utils import split, take_out_elements
 from bq_connector import BqServiceWrapper
@@ -33,6 +33,7 @@ _ALL_ACCOUNTS_TABLE_NAME = "AllAccounts"
 _ADS_TO_REMOVE_TABLE_NAME = "AdsToRemove"
 _PER_ACCOUNT_SUMMARY_TABLE_NAME = "PerAccountSummary"
 _PER_MCC_SUMMARY_TABLE_NAME = "PerMccSummary"
+_OUTPUT_PATH = "./output/"
 
 _REMOVE_ADS = None
 _PARALLEL_MODE = None
@@ -46,8 +47,7 @@ _NON_CRITICAL_TOPICS = [each_string.lower() for each_string in ['Destination', '
 _DEBUG_SUSPENSION_TOPICS = [each_string.lower() for each_string in ['Destination_not_working']]
 
 _NON_CRITICAL_TOPICS_FILE = './non_critical_topics.json'
-_DISAPPROVED_ADS_AUDIT_FILE_NAME = 'disapproved_ads_' + time.strftime("%Y%m%d-%H%M%S")
-_DISAPPROVED_ADS_AUDIT_FILE_PATH = Path('./results/' + _DISAPPROVED_ADS_AUDIT_FILE_NAME + '.json')
+
 
 
 def create_bq_tables():
@@ -71,7 +71,7 @@ def create_bq_tables():
                                       bigquery.SchemaField("mandatory_data", "STRING", mode="REQUIRED"),
                                       bigquery.SchemaField("timestamp", "TIMESTAMP", mode="REQUIRED"),
                                       bigquery.SchemaField("status", "string", mode="NULLABLE"),
-                                      bigquery.SchemaField("customer_id", "string", mode="NULLABLE"),
+                                      bigquery.SchemaField("account_id", "string", mode="NULLABLE"),
                                       bigquery.SchemaField("session_id", "string", mode="REQUIRED"),
                                       bigquery.SchemaField("removal_error", "string", mode="NULLABLE")
                                   ])
@@ -102,6 +102,7 @@ def main(top_id):
     top_mcc_total_removed_ads = 0
     create_bq_tables()
     accounts = flat_all_accounts(top_id, str(top_id))
+    write_to_file(_ALL_ACCOUNTS_TABLE_NAME, accounts)
     bqServiceWrapper.upload_rows_to_bq(table_id=_ALL_ACCOUNTS_TABLE_NAME, rows_to_insert=accounts)
     if _PARALLEL_MODE:
         with futures.ThreadPoolExecutor() as executor:
@@ -121,11 +122,13 @@ def main(top_id):
                 accounts_with_removed_ads += 1
             else:
                 accounts_without_removed_ads += 1
-    print(
+    perMccSummary = {
         f"\ntop_mcc_total_accounts = {accounts_with_removed_ads + accounts_without_removed_ads}, "
         f"accounts_with_removed_ads = {accounts_with_removed_ads}, "
         f"accounts_without_removed_ads = {accounts_without_removed_ads}, "
-        f"top_mcc_total_removed_ads = {top_mcc_total_removed_ads}")
+        f"top_mcc_total_removed_ads = {top_mcc_total_removed_ads}"}
+    print(perMccSummary)
+    write_to_file(_PER_MCC_SUMMARY_TABLE_NAME, perMccSummary)
     bqServiceWrapper.upload_rows_to_bq(
         table_id=_PER_MCC_SUMMARY_TABLE_NAME,
         rows_to_insert=[add_session_identifiers_bq_columns({"account_id": top_id,
@@ -136,11 +139,11 @@ def main(top_id):
                                                             "total_sub_accounts": accounts_with_removed_ads + accounts_without_removed_ads})])
 
 
-def flat_all_accounts(customer_id, hierarchy):
+def flat_all_accounts(account_id, hierarchy):
     """Returns a list {id, hierarchy} for all the descendant accounts of a given MCC account"""
-    accounts = gAdsServiceWrapper.get_sub_accounts(False, customer_id, hierarchy)
-    accounts.append({"account_id": customer_id, "hierarchy": hierarchy})
-    sub_mccs = gAdsServiceWrapper.get_sub_accounts(True, customer_id, hierarchy)
+    accounts = gAdsServiceWrapper.get_sub_accounts(False, account_id, hierarchy)
+    accounts.append({"account_id": account_id, "hierarchy": hierarchy})
+    sub_mccs = gAdsServiceWrapper.get_sub_accounts(True, account_id, hierarchy)
     if len(sub_mccs) > 0:
         for sub_mcc in sub_mccs:
             accounts = accounts + flat_all_accounts(sub_mcc["account_id"], sub_mcc["hierarchy"])
@@ -149,12 +152,12 @@ def flat_all_accounts(customer_id, hierarchy):
 
 def remove_disapproved_ads_for_account(account):
     """Remove all disapproved ads for a given customer id"""
-    customer_id = account["account_id"]
+    account_id = account["account_id"]
     ad_removal_operations = []
     ads_to_remove_json = []
-    rows = gAdsServiceWrapper.get_disapproved_ads_for_account(customer_id)
+    rows = gAdsServiceWrapper.get_disapproved_ads_for_account(account_id)
     ads_to_remove_count = 0
-    print(f"\nProcessing Account id: {customer_id} =============")
+    print(f"\nProcessing Account id: {account_id} =============")
 
     for batch in rows:
         for row in batch.results:
@@ -174,13 +177,13 @@ def remove_disapproved_ads_for_account(account):
                 ads_to_remove_json.append(ad_json)
                 if _REMOVE_ADS:
                     ad_removal_operations.append(
-                        build_ad_removal_sync_operation(customer_id, ad_json["ad_group_id"], row.ad_group_ad.ad.id))
+                        build_ad_removal_sync_operation(account_id, ad_json["ad_group_id"], row.ad_group_ad.ad.id))
 
     if len(ads_to_remove_json) > 0:
         ads_to_remove_json = audit_ads_before_remove(ads_to_remove_json)
     if len(ad_removal_operations) > 0:
-        remove_ads(ad_removal_operations, ads_to_remove_json, customer_id)
-    audit_ads_after_remove(customer_id, ads_to_remove_count)
+        remove_ads(ad_removal_operations, ads_to_remove_json, account_id)
+    audit_ads_after_remove(account_id, ads_to_remove_count)
     return ads_to_remove_count
 
 
@@ -197,9 +200,10 @@ def add_bq_columns_to_ad(ad_removal_item, status):
 
 
 def audit_ads_after_remove(account_id, ads_to_remove_count):
-    print(
+    data = {
         f"\nAccount-id: {account_id} ============= Finished Processing. # relevant disapproved ads found: "
-        f"{str(ads_to_remove_count)}")
+        f"{str(ads_to_remove_count)}"}
+    write_to_file(_PER_ACCOUNT_SUMMARY_TABLE_NAME, data)
     bqServiceWrapper.upload_rows_to_bq(
         table_id=_PER_ACCOUNT_SUMMARY_TABLE_NAME,
         rows_to_insert=[add_session_identifiers_bq_columns({"account_id": account_id,
@@ -209,10 +213,18 @@ def audit_ads_after_remove(account_id, ads_to_remove_count):
 def audit_ads_before_remove(ads_to_be_removed_json):
     ads_to_be_removed_json = [add_bq_columns_to_ad(ad_removal_item, None)
                               for ad_removal_item in ads_to_be_removed_json]
-    with open(Path(_DISAPPROVED_ADS_AUDIT_FILE_PATH), 'a') as f:
-        f.write("\n" + json.dumps(ads_to_be_removed_json))
+    write_to_file(_ADS_TO_REMOVE_TABLE_NAME, ads_to_be_removed_json)
     bqServiceWrapper.upload_rows_to_bq(table_id=_ADS_TO_REMOVE_TABLE_NAME, rows_to_insert=ads_to_be_removed_json)
     return ads_to_be_removed_json
+
+
+def add_output_path(file_name):
+    return Path(f"{_OUTPUT_PATH}/{file_name}_{time.strftime('%Y%m%d-%H%M%S')}.json")
+
+
+def write_to_file(file, content):
+    with open(add_output_path(file), 'a') as f:
+        f.write("\n" + json.dumps(content))
 
 
 def get_policy_extra(policy_summary):
@@ -236,12 +248,12 @@ def populate_errors(failed_items, errors):
         item["removal_error"] = error
 
 
-def remove_ads(removal_operations, removal_json, customer_id):
+def remove_ads(removal_operations, removal_json, account_id):
     operations_chucks = split(removal_operations, _CHUNK_SIZE)
     json_chunks = split(removal_json, _CHUNK_SIZE)
     for chunk_index, operations_chuck in enumerate(operations_chucks):
         try:
-            chunk_reponse = send_bulk_mutate_request(customer_id, operations_chuck)
+            chunk_reponse = send_bulk_mutate_request(account_id, operations_chuck)
         except GoogleAdsException as ex:
             handle_googleads_exception(ex)
         else:
@@ -265,7 +277,7 @@ def get_ad_hierarchy(account, campaign_id, ad_group_ad, ad):
     else:
         ad_group_id = ad_group_ad.ad_group
     return {"hierarchy": account["hierarchy"],
-            "customer_id": account["account_id"],
+            "account_id": account["account_id"],
             "campaign_id": campaign_id,
             "ad_group_id": ad_group_id,
             "ad_id": ad.id,
@@ -334,17 +346,17 @@ def is_topic_critical(current_topic, non_crucial_list):
     return True
 
 
-def build_ad_removal_sync_operation(customer_id, ad_group_id, ad_id):
-    resource_name = gAdsServiceWrapper.ad_group_ad_service.ad_group_ad_path(customer_id, ad_group_id, ad_id)
+def build_ad_removal_sync_operation(account_id, ad_group_id, ad_id):
+    resource_name = gAdsServiceWrapper.ad_group_ad_service.ad_group_ad_path(account_id, ad_group_id, ad_id)
     ad_group_ad_op1 = gAdsServiceWrapper.client.get_type("AdGroupAdOperation")
     ad_group_ad_op1.remove = resource_name
     return ad_group_ad_op1
 
 
-def send_bulk_mutate_request(customer_id, operations):
+def send_bulk_mutate_request(account_id, operations):
     # Issue a mutate request, setting partial_failure=True.
     request = gAdsServiceWrapper.client.get_type("MutateAdGroupAdsRequest")
-    request.customer_id = customer_id
+    request.customer_id = account_id
     request.operations = operations
     request.partial_failure = True
     return gAdsServiceWrapper.ad_group_ad_service.mutate_ad_group_ads(request=request)
@@ -443,6 +455,10 @@ def delete_tables():
     bqServiceWrapper.delete_table(_PER_ACCOUNT_SUMMARY_TABLE_NAME)
 
 
+def create_results_folder(output_path):
+    Path(output_path).mkdir(parents=True, exist_ok=True)
+
+
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(
         description=(
@@ -482,10 +498,11 @@ if __name__ == "__main__":
     while _TRIES_LEFT > 0:
         _TRIES_LEFT -= 1
         try:
+            create_results_folder(_OUTPUT_PATH)
             bqServiceWrapper = BqServiceWrapper(_DS_ID)
             if args.delete_db:
                 delete_tables()
-                sys.exit(0)
+                time.sleep(30)  # Number of seconds
             gAdsServiceWrapper = GAdsServiceWrapper(args.top_id)
             main(args.top_id)
             sys.exit(0)

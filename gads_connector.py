@@ -1,7 +1,7 @@
 from google.ads.googleads.client import GoogleAdsClient
 
 GOOGLE_ADS_YAML = './google-ads.yaml'
-
+_TIMEOUT_MILLIS = 1000 * 15
 
 class GAdsServiceWrapper:
     """Wraps GoogleAdsService API request"""
@@ -82,7 +82,24 @@ class GAdsServiceWrapper:
               ad_group_ad.policy_summary.approval_status,
               ad_group_ad.policy_summary.policy_topic_entries
             FROM ad_group_ad
-            WHERE
+            WHERE         
                 ad_group_ad.policy_summary.approval_status = DISAPPROVED
                 AND ad_group_ad.status != REMOVED  """
         return self.get_stream_of_rows(customer_id, query)
+
+
+#1:  SPLIT
+
+#2:  SELECT TOP 700 * FROM yourTable
+# EXCEPT
+# SELECT TOP 500 * FROM yourTable
+
+#3: ; WITH MySelectedRows AS (
+#  SELECT ROW_NUMBER() OVER (ORDER BY MySortColumn DESC) as RowNumber, *
+#  FROM MyTable
+#  WHERE <some clause>
+# )
+# SELECT * FROM MySelectedRows
+# WHERE RowNumber BETWEEN 501 AND 700
+
+# AND campaign.advertising_channel_type = SEARCH

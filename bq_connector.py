@@ -3,7 +3,7 @@ from google.cloud import bigquery
 
 from array_utils import split
 
-_UPDATE_CHUNK_SIZE = 1000
+_BQ_CHUNK_SIZE = 1000
 
 class BqServiceWrapper:
 
@@ -71,41 +71,41 @@ class BqServiceWrapper:
 
     def upload_rows_to_bq(self, table_id, rows_to_insert):
         table_full_name = self.get_table_full_name(table_id)
-        errors = self.client.insert_rows_json(
-            table_full_name, rows_to_insert, row_ids=[None] * len(rows_to_insert))  # Make an API request.
-        if not errors:
-            print("New rows have been added.")
-        else:
-            print("Encountered errors while inserting rows: {}".format(errors))
+        for ads_chunk in split(rows_to_insert, _BQ_CHUNK_SIZE):
+            errors = self.client.insert_rows_json(
+                table_full_name, ads_chunk, row_ids=[None] * len(rows_to_insert))  # Make an API request.
+            if not errors:
+                print("New rows have been added.")
+            else:
+                print("Encountered errors while inserting rows: {}".format(errors))
 
     def update_bq_ads_status_failed(self, table_id, update_ads):
         affected_rows = 0
         table_full_name = self.get_table_full_name(table_id)
-        for update_ads_chunk in split(update_ads, _UPDATE_CHUNK_SIZE):
+        for update_ads_chunk in split(update_ads, _BQ_CHUNK_SIZE):
             ad_ids = [item["ad_id"] for item in update_ads_chunk]
             removal_errors = [item["removal_error"] for item in update_ads_chunk]
-
-            update_removal_error = ""
-            for ad_id, removal_error in zip(ad_ids, removal_errors):
-                update_removal_error = update_removal_error + \
-                                       f''' WHEN ad_id = '{ad_id}' Then '{removal_error}' '''
+            update_removal_error = " ".join(
+                f"WHEN ad_id = '{ad_id}' THEN '{removal_error}'"
+                for ad_id, removal_error in zip(ad_ids, removal_errors)
+            )
             affected_rows += self.update_bq_ads_status(f"""
-                            UPDATE '{table_full_name}' 
-                            SET status = 'Failed Removing'  
-                SET removal_error = CASE {update_removal_error} END 
-                WHERE ad_id IN {str(ad_ids)}
+                    UPDATE {table_full_name}
+                    SET status = 'Failed Removing', 
+                    removal_error = CASE {update_removal_error} END
+                    WHERE ad_id IN {tuple(ad_ids)}
                 """)
         return affected_rows
 
     def update_bq_ads_status_removed(self, table_id, update_ads):
         affected_rows = 0
         table_full_name = self.get_table_full_name(table_id)
-        for update_ads_chunk in split(update_ads, _UPDATE_CHUNK_SIZE):
+        for update_ads_chunk in split(update_ads, _BQ_CHUNK_SIZE):
             ad_ids = [item["ad_id"] for item in update_ads_chunk]
             affected_rows +=self.update_bq_ads_status(f"""
-                            UPDATE '{table_full_name}' 
+                            UPDATE {table_full_name} 
                             SET status = 'Removed' 
-                            WHERE ad_id IN {str(ad_ids)} 
+                            WHERE ad_id IN {tuple(ad_ids)} 
                             """)
         return affected_rows
 

@@ -1,4 +1,4 @@
-# Bowling - refrain from Google's `3 strikes account suspension`
+# Bowling - avoid from Google's '3 strikes account suspension'
 
 Starting Sep 21, Google has a new violation policy: when an ad is being disapproved 3 times due to some specific topic violation, Google can suspend a whole account.
 The tool audits (and optionally deletes) the disapproved ads that can cause account suspension.
@@ -15,7 +15,7 @@ Contact: eladb@google.com
 
 ## What is it?
 
-A script to collect all disapproved apps (excluding ads with policy topics from "non_critical_topics.json") in order to avoid account suspension.
+A tool to collect all disapproved apps (excluding ads with policy non critical topics from "non_critical_topics.json") in order to avoid account suspension.
 
 Options to:
 - Only audit the ads
@@ -35,10 +35,10 @@ Options to:
 
 ## Setup
 
-1. Clone the repository (reach out to eylong@google.com for access)
+1. Clone the repository (reach out to eladb@google.com, dvirka@google.com for access to the user-group: g/solutions_bowling-readers)
 
 ```shell
-git clone https://professional-services.googlesource.com/solutions/kw_rec
+git clone https://professional-services.googlesource.com/solutions/bowling
 ```
 
 2. Fill in credentials in "google-ads.yaml" file
@@ -55,6 +55,17 @@ pip3 install google-ads==10.0.0
 pip3 install --user --upgrade google-cloud-bigquery
 ```
 
+5. Create a GCP service-account (type: desktop-client) and download its key. See [GCP doc] (https://cloud.google.com/docs/authentication/getting-started).
+Give that service-account `bigquery.user` role (BigQuery Job User)
+
+6. 
+Set an environment variable:
+
+```shell
+export GOOGLE_APPLICATION_CREDENTIALS = <YOUR_SERVICE_ACCOUNT_KEY>
+
+```
+
 ## Running
 
 1. To run the tool for all accounts under MCC, run the main script with the -id (account_id) flag:
@@ -69,7 +80,7 @@ python3 main.py -id <ACCUNT_ID>
   ```shell
   python3 main.py -p
   ```
-- Run the tool and immidiatly delete all ads:
+- Run the tool and immediately delete all ads:
   ```shell
   python3 main.py -rm
   ```
@@ -88,10 +99,18 @@ python3 main.py -id <ACCUNT_ID>
 
 
 The results will be saved under the "output" folder and under BQ dataset "google_3_strikes"
-```
-"AllAccounts" - lists all the subMCC and sub accounts
-"AdsToRemove" - list all the ads to be removed
-"PerAccountSummary" - when finished processing an account, it sums the numbers of ads to be removed, ads that have been removed
-"PerMccSummary" - similar sums per top-MCC level
-```
+
+ * "AllAccounts" - lists all the subMCC and sub accounts
+ * "AdsToRemove" - list all the ads to be removed
+ * "PerAccountSummary" - when finished processing an account, it sums the numbers of ads to be removed, ads that have been removed
+ * "PerMccSummary" - similar sums per top-MCC level
+
+
+ ## Change history
+See [CHANGELOG](CHANGELOG.md)
+ 
+ 
+ ## License
+Apache Version 2.0
+See [LICENSE](LICENSE)
 

@@ -1,7 +1,23 @@
+# Copyright 2021 Google LLC
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#     https://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+
 from google.ads.googleads.client import GoogleAdsClient
 
 GOOGLE_ADS_YAML = './google-ads.yaml'
 _TIMEOUT_MILLIS = 1000 * 15
+
 
 class GAdsServiceWrapper:
     """Wraps GoogleAdsService API request"""
@@ -54,11 +70,12 @@ class GAdsServiceWrapper:
             for row in batch.results:
                 customer_id_str = str(row.customer_client.id)
                 if not customer_id_str == customer_id:
-                    accounts.append({"account_id": customer_id_str, "hierarchy": hierarchy + '_' + customer_id_str})
+                    accounts.append({"account_id": customer_id_str,
+                                     "hierarchy": hierarchy + '_' + customer_id_str})
         return accounts
 
     def get_disapproved_ads_for_account(self, customer_id):
-        query = f"""
+        query = """
             SELECT
               customer.id,
               campaign.id,
@@ -86,20 +103,3 @@ class GAdsServiceWrapper:
                 ad_group_ad.policy_summary.approval_status = DISAPPROVED
                 AND ad_group_ad.status != REMOVED  """
         return self.get_stream_of_rows(customer_id, query)
-
-
-#1:  SPLIT
-
-#2:  SELECT TOP 700 * FROM yourTable
-# EXCEPT
-# SELECT TOP 500 * FROM yourTable
-
-#3: ; WITH MySelectedRows AS (
-#  SELECT ROW_NUMBER() OVER (ORDER BY MySortColumn DESC) as RowNumber, *
-#  FROM MyTable
-#  WHERE <some clause>
-# )
-# SELECT * FROM MySelectedRows
-# WHERE RowNumber BETWEEN 501 AND 700
-
-# AND campaign.advertising_channel_type = SEARCH

@@ -13,6 +13,7 @@
 # limitations under the License.
 
 def split(arr, size):
+    """Splits an array to smaller arrays of size"""
     arrays = []
     while len(arr) > size:
         piece = arr[:size]
@@ -23,6 +24,7 @@ def split(arr, size):
 
 
 def take_out_elements(list_object, indices):
+    """Removes elements from list in specified indices"""
     removed_elements = []
     indices = sorted(indices, reverse=True)
     for idx in indices:

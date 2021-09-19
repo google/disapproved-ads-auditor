@@ -47,6 +47,7 @@ class GAdsServiceWrapper:
         self._customer_id = customer_id
 
     def get_stream_of_rows(self, customer_id, query):
+        """Returns a stream of results from GAds API"""
         search_request = self._client.get_type("SearchGoogleAdsStreamRequest")
         search_request.customer_id = customer_id
         search_request.query = query
@@ -74,7 +75,8 @@ class GAdsServiceWrapper:
                                      "hierarchy": hierarchy + '_' + customer_id_str})
         return accounts
 
-    def get_disapproved_ads_for_account(self, customer_id):
+    def get_disapproved_ads_for_account(self, account_id):
+        """Returns disapproved ads for account"""
         query = """
             SELECT
               customer.id,
@@ -102,4 +104,4 @@ class GAdsServiceWrapper:
             WHERE         
                 ad_group_ad.policy_summary.approval_status = DISAPPROVED
                 AND ad_group_ad.status != REMOVED  """
-        return self.get_stream_of_rows(customer_id, query)
+        return self.get_stream_of_rows(account_id, query)

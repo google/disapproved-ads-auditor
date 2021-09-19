@@ -1,7 +1,7 @@
-# Bowling - avoid from Google's '3 strikes account suspension'
+# Bowling - avoid Google's '3 strikes account suspension'
 
 Starting Sep 21, Google has a new violation policy: when an ad is being disapproved 3 times due to some specific topic violation, Google can suspend a whole account.
-The tool audits (and optionally deletes) the disapproved ads that can cause account suspension.
+The tool audits (and optionally deletes) the disapproved ads that can cause account suspension [Policy Deatils](https://support.google.com/google-ads/answer/10957124?hl=en).
 
 
 ## Disclaimer
@@ -17,7 +17,7 @@ Contact: eladb@google.com
 
 A tool to collect all disapproved apps (excluding ads with policy non critical topics from "non_critical_topics.json") in order to avoid account suspension.
 
-Options to:
+Possible actions:
 - Only audit the ads
 - Audit and remove the ads
 
@@ -74,20 +74,27 @@ export GOOGLE_APPLICATION_CREDENTIALS = <YOUR_SERVICE_ACCOUNT_KEY>
 python3 main.py -id <ACCUNT_ID>
 ```
 
-### Optional flags
+### Optional Configurations (flags)
 
-- Run the tool in parallel mode for each sub-account:
   ```shell
-  python3 main.py -p
+  -p
+  ```
+- Run the tool in parallel mode for each sub-account:
+
+  ```shell
+  -rm
   ```
 - Run the tool and immediately delete all ads:
+
   ```shell
-  python3 main.py -rm
+  -bq
+  ```
+- Write to BigQuery in addition to output file:
+
+  ```shell
+  -ddb
   ```
 - Delete all relevant tables in BigQuery:
-  ```shell
-  python3 main.py -ddb
-  ```
 
 ### Python reminder
 - Redirect tool's output to file:
@@ -98,12 +105,65 @@ python3 main.py -id <ACCUNT_ID>
 ## Output
 
 
-The results will be saved under the "output" folder and under BQ dataset "google_3_strikes"
+The results will be saved under the "output" folder (and optionally under BQ dataset "google_3_strikes")
 
- * "AllAccounts" - lists all the subMCC and sub accounts
- * "AdsToRemove" - list all the ads to be removed
+
+ * "AllAccounts" - lists all the subMCC and sub accounts that were scanned
+![_ALL_ACCOUNTS_TABLE_SCHEMA](/images/_ALL_ACCOUNTS_TABLE_SCHEMA.jpg)
+
+account_id
+hierarchy: Mcc_SubMcc_SubAccount.
+timestamp: when scanning all the sub accounts finished.
+session_id: identifies the last run and join with other tables.
+
+
+
+ * "AdsToRemove" - list all the ads to be removed *including* all the data required for re-uploading the ads (if they were removed).
+![_ADS_TO_REMOVE_TABLE_SCHEMA](/images/_ADS_TO_REMOVE_TABLE_SCHEMA.jpg)
+
+ Based on (Google Ads ad_group_ad report)[https://developers.google.com/google-ads/api/fields/v8/ad_group_ad#ad_group_ad.ad.final_urls]
+- ad_id
+- ad_type
+- ad_group_id
+- campaign_id
+- hierarchy: Mcc_SubMcc_SubAccount.
+- final_urls: The list of possible final URLs after all cross-domain redirects for the ad.
+- policy_topics
+- evidences
+- mandatory_data
+- timestamp: when the `bowling_status` was set.
+- bowling_status: `SCANNED`, `REMOVED`, `FAILED_TO_REMOVE`.
+- account_id
+- session_id: identifies the last run and join with other tables.
+- removal_error: Google server error in case `bowling_status = FAILED_TO_REMOVE`
+
+
+
  * "PerAccountSummary" - when finished processing an account, it sums the numbers of ads to be removed, ads that have been removed
+![_PER_ACCOUNT_SUMMARY_SCHEMA](/images/_PER_ACCOUNT_SUMMARY_SCHEMA.jpg)
+- account_id
+- ads_to_remove_count: total # of ads to remove.
+- timestamp: when scan for this account ended.
+- session_id: identifies the last run and join with other tables.
+
+
  * "PerMccSummary" - similar sums per top-MCC level
+![_PER_MCC_SUMMARY_SCHEMA](/images/_PER_MCC_SUMMARY_SCHEMA.jpg)
+- account_id
+- total_sub_accounts: total # of sub accounts.
+- top_mcc_total_ads_to_remove: total # of ads to remove.
+- timestamp: when the scan for the whole mcc ended.
+- session_id: identifies the last run and join with other tables.
+
+
+ ## Example of a relevant SQL query
+[SQL query](src/sql/Report.sql)
+
+ ## Notes and recommendations:
+ * Run the code as a cron-job over the cloud.
+ * Monitor that cron-job with mail alerts when it fails to run.
+ * The code does 3 retries if it crashes.
+ * Google BQ API allows a built-in retry mechanism (see [BQ query API](https://googleapis.dev/python/bigquery/latest/generated/google.cloud.bigquery.client.Client.html#google.cloud.bigquery.client.Client.query))
 
 
  ## Change history

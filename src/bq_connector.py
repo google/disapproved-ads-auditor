@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+from enum import Enum
+
 from google.api_core.exceptions import NotFound
 from google.cloud import bigquery
 
@@ -19,6 +21,12 @@ from array_utils import split
 
 _BQ_CHUNK_SIZE = 1000
 _BQ_QUERY_TIMEOUT = 10.0 * 60.0
+
+
+class BowlingStatus(Enum):
+    SCANNED = 1
+    REMOVED = 2
+    FAILED_TO_REMOVE = 3
 
 
 class BqServiceWrapper:
@@ -34,6 +42,7 @@ class BqServiceWrapper:
         self._ds = self.create_dataset(self._ds_full_name)
 
     def create_dataset(self, dataset_id):
+        """Creates dataset"""
         dataset = self.get_dataset(dataset_id)
         if dataset is not None:
             return None
@@ -44,6 +53,7 @@ class BqServiceWrapper:
         return dataset
 
     def create_table(self, table_id, schema):
+        """Creates table"""
         table_full_name = self.get_table_full_name(table_id)
         table = self.get_table(table_full_name)
         if table is not None:
@@ -54,6 +64,7 @@ class BqServiceWrapper:
         print("Created table {}.{}.{}".format(table.project, table.dataset_id, table.table_id))
 
     def delete_table(self, table_id):
+        """Deletes dataset"""
         table_full_name = self.get_table_full_name(table_id)
         table = self.get_table(table_full_name)
         if table is not None:
@@ -61,6 +72,7 @@ class BqServiceWrapper:
             print("Deleted table '{}'.".format(table_full_name))
 
     def get_dataset(self, dataset_full_name):
+        """Returns dataset by name"""
         dataset = None
         try:
             dataset = self.client.get_dataset(dataset_full_name)  # Make an API request.
@@ -70,6 +82,7 @@ class BqServiceWrapper:
         return dataset
 
     def get_table(self, table_full_name):
+        """Returns table by name"""
         table = None
         try:
             table = self.client.get_table(table_full_name)  # Make an API request.
@@ -79,19 +92,34 @@ class BqServiceWrapper:
         return table
 
     def get_table_full_name(self, table_id):
+        """Returns table full name"""
         return self._ds_full_name + f".{table_id}"
 
     def upload_rows_to_bq(self, table_id, rows_to_insert):
         table_full_name = self.get_table_full_name(table_id)
         for ads_chunk in split(rows_to_insert, _BQ_CHUNK_SIZE):
-            errors = self.client.insert_rows_json(table_full_name, ads_chunk,
-                row_ids=[None] * len(rows_to_insert))  # Make an API request.
+            errors = self.client.insert_rows_json(table_full_name, ads_chunk, row_ids=[None] * len(
+                rows_to_insert))  # Make an API request.
             if not errors:
                 print("New rows have been added.")
             else:
                 print("Encountered errors while inserting rows: {}".format(errors))
 
+    def update_bq_ads_status_removed(self, table_id, update_ads):
+        """Updates BQ table with status 'REMOVED' for ads"""
+        affected_rows = 0
+        table_full_name = self.get_table_full_name(table_id)
+        for update_ads_chunk in split(update_ads, _BQ_CHUNK_SIZE):
+            ad_ids = [item["ad_id"] for item in update_ads_chunk]
+            affected_rows += self.update_bq_ads_status(f"""
+                            UPDATE {table_full_name} 
+                            SET bowling_status = {BowlingStatus.REMOVED.name}
+                            WHERE ad_id IN {tuple(ad_ids)} 
+                            """)
+        return affected_rows
+
     def update_bq_ads_status_failed(self, table_id, update_ads):
+        """Updates BQ table with status 'FAILED_TO_REMOVE' for ads"""
         affected_rows = 0
         table_full_name = self.get_table_full_name(table_id)
         for update_ads_chunk in split(update_ads, _BQ_CHUNK_SIZE):
@@ -102,25 +130,14 @@ class BqServiceWrapper:
                 zip(ad_ids, removal_errors))
             affected_rows += self.update_bq_ads_status(f"""
                     UPDATE {table_full_name}
-                    SET status = 'Failed Removing', 
+                    SET bowling_status = {BowlingStatus.FAILED_TO_REMOVE.name}, 
                     removal_error = CASE {update_removal_error} END
                     WHERE ad_id IN {tuple(ad_ids)}
                 """)
         return affected_rows
 
-    def update_bq_ads_status_removed(self, table_id, update_ads):
-        affected_rows = 0
-        table_full_name = self.get_table_full_name(table_id)
-        for update_ads_chunk in split(update_ads, _BQ_CHUNK_SIZE):
-            ad_ids = [item["ad_id"] for item in update_ads_chunk]
-            affected_rows += self.update_bq_ads_status(f"""
-                            UPDATE {table_full_name} 
-                            SET status = 'Removed' 
-                            WHERE ad_id IN {tuple(ad_ids)} 
-                            """)
-        return affected_rows
-
     def update_bq_ads_status(self, query_text):
+        """Updates BQ table with specific status for ads"""
         query_job = self.client.query(query_text, timeout=_BQ_QUERY_TIMEOUT)
         query_job.result()  # Wait for query job to finish.
         print(f"DML query modified {query_job.num_dml_affected_rows} rows.")

@@ -35,7 +35,7 @@ Possible actions:
 
 ## Setup
 
-1. Clone the repository (reach out to eladb@google.com, dvirka@google.com for access to the user-group: g/solutions_bowling-readers)
+1. Clone the repository (reach out to eladb@google.com, dvirka@google.com for access to the user-group: https://groups.google.com/a/professional-services.goog/g/solutions_bowling-readers/members)
 
 ```shell
 git clone https://professional-services.googlesource.com/solutions/bowling
@@ -63,7 +63,6 @@ Set an environment variable:
 
 ```shell
 export GOOGLE_APPLICATION_CREDENTIALS = <YOUR_SERVICE_ACCOUNT_KEY>
-
 ```
 
 ## Running
@@ -74,29 +73,19 @@ export GOOGLE_APPLICATION_CREDENTIALS = <YOUR_SERVICE_ACCOUNT_KEY>
 python3 main.py -id <ACCUNT_ID>
 ```
 
-### Optional Configurations (flags)
 
-  ```shell
-  -p
-  ```
-- Run the tool in parallel mode for each sub-account:
+#### Customization
+`main.python` supports several command line arguments with which you can customize defaults:
 
-  ```shell
-  -rm
-  ```
-- Run the tool and immediately delete all ads:
+* `-p`    | `--parallel`    - Runs in parallel for each sub-account.
+* `-rm`   | `--remove_ads`  - Audits and removes the ads.
+* `-bq`   | `--write_to_bq` - Audits in BQ in addition to local file.
+* `-ddb`  | `--delete_db`   - Deletes the BQ tables which are relevant to the tool.
 
-  ```shell
-  -bq
-  ```
-- Write to BigQuery in addition to output file:
 
-  ```shell
-  -ddb
-  ```
-- Delete all relevant tables in BigQuery:
 
-### Python reminder
+
+#### Python reminder
 - Redirect tool's output to file:
   ```shell
   python3 main.py > logFile
@@ -104,13 +93,12 @@ python3 main.py -id <ACCUNT_ID>
 
 ## Output
 
-
 The results will be saved under the "output" folder (and optionally under BQ dataset "google_3_strikes")
 
 
  * "AllAccounts" - lists all the subMCC and sub accounts that were scanned
-![_ALL_ACCOUNTS_TABLE_SCHEMA](/images/_ALL_ACCOUNTS_TABLE_SCHEMA.jpg)
-
+[![all accounts][1]][1]
+  
 account_id
 hierarchy: Mcc_SubMcc_SubAccount.
 timestamp: when scanning all the sub accounts finished.
@@ -119,7 +107,7 @@ session_id: identifies the last run and join with other tables.
 
 
  * "AdsToRemove" - list all the ads to be removed *including* all the data required for re-uploading the ads (if they were removed).
-![_ADS_TO_REMOVE_TABLE_SCHEMA](/images/_ADS_TO_REMOVE_TABLE_SCHEMA.jpg)
+[![per account][2]][2]
 
  Based on (Google Ads ad_group_ad report)[https://developers.google.com/google-ads/api/fields/v8/ad_group_ad#ad_group_ad.ad.final_urls]
 - ad_id
@@ -140,7 +128,8 @@ session_id: identifies the last run and join with other tables.
 
 
  * "PerAccountSummary" - when finished processing an account, it sums the numbers of ads to be removed, ads that have been removed
-![_PER_ACCOUNT_SUMMARY_SCHEMA](/images/_PER_ACCOUNT_SUMMARY_SCHEMA.jpg)
+[![per mcc summary][3]][3]
+
 - account_id
 - ads_to_remove_count: total # of ads to remove.
 - timestamp: when scan for this account ended.
@@ -148,7 +137,7 @@ session_id: identifies the last run and join with other tables.
 
 
  * "PerMccSummary" - similar sums per top-MCC level
-![_PER_MCC_SUMMARY_SCHEMA](/images/_PER_MCC_SUMMARY_SCHEMA.jpg)
+[![Ads to remove][4]][4]
 - account_id
 - total_sub_accounts: total # of sub accounts.
 - top_mcc_total_ads_to_remove: total # of ads to remove.
@@ -174,3 +163,11 @@ See [CHANGELOG](CHANGELOG.md)
 Apache Version 2.0
 See [LICENSE](LICENSE)
 
+
+
+
+  [1]: https://i.stack.imgur.com/9osCD.png
+  [2]: https://i.stack.imgur.com/TdaxX.png
+  [3]: https://i.stack.imgur.com/vHRrA.png
+  [4]: https://i.stack.imgur.com/zistH.png
+  

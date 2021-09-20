@@ -15,7 +15,7 @@
 
 from google.ads.googleads.client import GoogleAdsClient
 
-GOOGLE_ADS_YAML = './google-ads.yaml'
+GOOGLE_ADS_YAML = './secret_keys/google-ads.yaml'
 _TIMEOUT_MILLIS = 1000 * 15
 
 

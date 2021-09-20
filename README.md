@@ -41,7 +41,18 @@ Possible actions:
 git clone https://professional-services.googlesource.com/solutions/bowling
 ```
 
-2. Fill in credentials in "google-ads.yaml" file
+2. Fill in credentials in "src/secret_keys/google-ads.yaml" file
+
+```shell
+﻿client_customer_id:
+client_id:
+client_secret:
+developer_token:
+login_customer_id:
+refresh_token:
+```
+
+
 
 3. Install google ads API
 
@@ -55,11 +66,10 @@ pip3 install google-ads==10.0.0
 pip3 install --user --upgrade google-cloud-bigquery
 ```
 
-5. Create a GCP service-account (type: desktop-client) and download its key. See [GCP doc] (https://cloud.google.com/docs/authentication/getting-started).
-Give that service-account `bigquery.user` role (BigQuery Job User)
+5. Create a GCP service-account (type: desktop-client) and download its key. See [GCP doc](https://cloud.google.com/docs/authentication/getting-started).
+Give that service-account `bigquery.user` role (`BigQuery Job User`)
 
-6. 
-Set an environment variable:
+6. Set an environment variable:
 
 ```shell
 export GOOGLE_APPLICATION_CREDENTIALS = <YOUR_SERVICE_ACCOUNT_KEY>
@@ -82,7 +92,8 @@ python3 main.py -id <ACCUNT_ID>
 * `-bq`   | `--write_to_bq` - Audits in BQ in addition to local file.
 * `-ddb`  | `--delete_db`   - Deletes the BQ tables which are relevant to the tool.
 
-
+##### [WIP Customization]
+* `-clean_bq` | `--clean_outdated_bq`  -Delete outdated rows in BQ (ads that has `bowling_status = SCANNED` and another newer `bowling_status`).
 
 
 #### Python reminder
@@ -120,7 +131,7 @@ session_id: identifies the last run and join with other tables.
 - evidences
 - mandatory_data
 - timestamp: when the `bowling_status` was set.
-- bowling_status: `SCANNED`, `REMOVED`, `FAILED_TO_REMOVE`.
+- bowling_status: `SCANNED`, `REMOVED`, `FAILED_TO_REMOVE`. Another row is usually added for status change instead of being updated.
 - account_id
 - session_id: identifies the last run and join with other tables.
 - removal_error: Google server error in case `bowling_status = FAILED_TO_REMOVE`

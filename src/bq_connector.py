@@ -21,7 +21,7 @@ from array_utils import split
 
 _BQ_CHUNK_SIZE = 1000
 _BQ_QUERY_TIMEOUT = 10.0 * 60.0
-
+_BQ_MAX_ROW_TO_DELETE = 2000
 
 class BowlingStatus(Enum):
     SCANNED = 1
@@ -96,6 +96,7 @@ class BqServiceWrapper:
         return self._ds_full_name + f".{table_id}"
 
     def upload_rows_to_bq(self, table_id, rows_to_insert):
+        """Inserts rows to BQ"""
         table_full_name = self.get_table_full_name(table_id)
         for ads_chunk in split(rows_to_insert, _BQ_CHUNK_SIZE):
             errors = self.client.insert_rows_json(table_full_name, ads_chunk, row_ids=[None] * len(
@@ -105,39 +106,18 @@ class BqServiceWrapper:
             else:
                 print("Encountered errors while inserting rows: {}".format(errors))
 
-    def update_bq_ads_status_removed(self, table_id, update_ads):
-        """Updates BQ table with status 'REMOVED' for ads"""
+
+    def remove_outdated_scanned_rows(self, table_id):
+        """Removes rows with outdated status scanned"""
         affected_rows = 0
         table_full_name = self.get_table_full_name(table_id)
-        for update_ads_chunk in split(update_ads, _BQ_CHUNK_SIZE):
-            ad_ids = [item["ad_id"] for item in update_ads_chunk]
-            affected_rows += self.update_bq_ads_status(f"""
-                            UPDATE {table_full_name} 
-                            SET bowling_status = {BowlingStatus.REMOVED.name}
-                            WHERE ad_id IN {tuple(ad_ids)} 
-                            """)
-        return affected_rows
-
-    def update_bq_ads_status_failed(self, table_id, update_ads):
-        """Updates BQ table with status 'FAILED_TO_REMOVE' for ads"""
-        affected_rows = 0
-        table_full_name = self.get_table_full_name(table_id)
-        for update_ads_chunk in split(update_ads, _BQ_CHUNK_SIZE):
-            ad_ids = [item["ad_id"] for item in update_ads_chunk]
-            removal_errors = [item["removal_error"] for item in update_ads_chunk]
-            update_removal_error = " ".join(
-                f"WHEN ad_id = '{ad_id}' THEN '{removal_error}'" for ad_id, removal_error in
-                zip(ad_ids, removal_errors))
-            affected_rows += self.update_bq_ads_status(f"""
-                    UPDATE {table_full_name}
-                    SET bowling_status = {BowlingStatus.FAILED_TO_REMOVE.name}, 
-                    removal_error = CASE {update_removal_error} END
-                    WHERE ad_id IN {tuple(ad_ids)}
-                """)
-        return affected_rows
-
-    def update_bq_ads_status(self, query_text):
-        """Updates BQ table with specific status for ads"""
+        query_text = f""" DELETE TOP {_BQ_MAX_ROW_TO_DELETE} FROM {table_full_name} o
+                            WHERE timestamp < TIMESTAMP_SUB(CURRENT_TIMESTAMP(), INTERVAL 120 
+                            MINUTE) AND timestamp not in ( 
+                                                SELECT MAX(timestamp) 
+                                                FROM  {table_full_name}  i 
+                                                WHERE i.ad_id=o.ad_id 
+                                                GROUP  BY ad_id) """
         query_job = self.client.query(query_text, timeout=_BQ_QUERY_TIMEOUT)
         query_job.result()  # Wait for query job to finish.
         print(f"DML query modified {query_job.num_dml_affected_rows} rows.")

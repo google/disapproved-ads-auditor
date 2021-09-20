@@ -59,7 +59,7 @@ _PER_MCC_SUMMARY_TABLE_NAME = "PerMccSummary"
 _OUTPUT_PATH = "../output/"
 
 _CHUNK_SIZE = 5000
-_TRIES_LEFT = 3
+_RETRIES_LEFT = 2
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s - %(levelname)s] %(message).5000s')
 logging.getLogger('google.ads.googleads.client').setLevel(logging.INFO)
@@ -277,31 +277,37 @@ def get_policy_extra(policy_summary):
 def populate_errors(failed_items, errors):
     """Populate ads with corresponding removal errors"""
     for item, error in zip(failed_items, errors):
+        item["bowling_status"] = {BowlingStatus.FAILED_TO_REMOVE.name}
         item["removal_error"] = error
+
+
+def update_status_removed(removed_items):
+    """Update ads with status removed"""
+    for item in removed_items:
+        item["bowling_status"] = {BowlingStatus.REMOVED.name}
 
 
 def remove_ads(removal_operations, removal_json, account_id):
     """Removes ads"""
     operations_chucks = split(removal_operations, _CHUNK_SIZE)
-    json_chunks = split(removal_json, _CHUNK_SIZE)
+    json_request_chunks = split(removal_json, _CHUNK_SIZE)
     for chunk_index, operations_chuck in enumerate(operations_chucks):
         try:
-            chunk_reponse = send_bulk_mutate_request(account_id, operations_chuck)
+            response_chunk = send_bulk_mutate_request(account_id, operations_chuck)
         except GoogleAdsException as ex:
             handle_googleads_exception(ex)
         else:
             # Remove succeeded
-            index_array, error_array = _print_results(chunk_reponse)
-            removed_items = json_chunks[chunk_index]
+            index_array, error_array = _print_results(response_chunk)
+            removed_items = json_request_chunks[chunk_index]
             failed_items = take_out_elements(removed_items, index_array)
+            update_status_removed(failed_items)
             populate_errors(failed_items, error_array)
-            write_to_file(_ADS_TO_REMOVE_TABLE_NAME, removed_items)
-            write_to_file(_ADS_TO_REMOVE_TABLE_NAME, failed_items)
+            all_items = removed_items + failed_items
+            write_to_file(_ADS_TO_REMOVE_TABLE_NAME, all_items)
             if _WRITE_TO_BQ:
-                bqServiceWrapper.update_bq_ads_status_removed(table_id=_ADS_TO_REMOVE_TABLE_NAME,
-                                                              update_ads=removed_items)
-                bqServiceWrapper.update_bq_ads_status_failed(table_id=_ADS_TO_REMOVE_TABLE_NAME,
-                                                             update_ads=failed_items)
+                bqServiceWrapper.upload_rows_to_bq(table_id=_ADS_TO_REMOVE_TABLE_NAME,
+                                                   rows_to_insert=all_items)
 
 
 def get_ad_hierarchy(account, campaign_id, ad_group_ad, ad):
@@ -503,15 +509,19 @@ if __name__ == "__main__":
                                                                           "in addition to a local "
                                                                           "file.", )
     parser.add_argument("-ddb", "--delete_db", action="store_true", help="Delete DB tables.", )
+    parser.add_argument("-clean_bq", "--clean_outdated_bq", action="store_true", help="Clean "
+                                                                                      "outdated "
+                                                                             "rows in BQ.", )
 
     args = parser.parse_args()
     _REMOVE_ADS = args.remove_ads
     _PARALLEL_MODE = args.parallel
     _WRITE_TO_BQ = args.write_to_bq
+
     load_non_critical_topics()
     CURRENT_SESSION_ID = str(uuid.uuid4())
-    while _TRIES_LEFT > 0:
-        _TRIES_LEFT -= 1
+    while _RETRIES_LEFT > 0:
+        _RETRIES_LEFT -= 1
         try:
             create_results_folder(_OUTPUT_PATH)
             if _WRITE_TO_BQ:
@@ -519,6 +529,8 @@ if __name__ == "__main__":
                 if args.delete_db:
                     delete_tables()
                     time.sleep(30)  # Number of seconds
+                elif args.clean_outdated_bq:
+                    bqServiceWrapper.remove_outdated_scanned_rows(_ADS_TO_REMOVE_TABLE_NAME)
             gAdsServiceWrapper = GAdsServiceWrapper(args.top_id)
             main(args.top_id)
             sys.exit(0)

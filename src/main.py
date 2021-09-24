@@ -25,6 +25,8 @@
 # its usage, including with respect to your deployment of any portion of this solution in your
 # systems, or usage in connection with your business, if at all.
 #
+# Author: Elad Ben David
+
 """Retrieves and removes disapproved ads for an MCC tree. Collects all disapproved apps (
 excluding ads with policy
 non critical topics from "non_critical_topics.json") in order to avoid account suspension.
@@ -366,8 +368,9 @@ def extract_text_from_proto(proto_list):
 def load_non_critical_topics():
     """Loads topics non crucial list (exclusion list)"""
     with open(_NON_CRITICAL_TOPICS_FILE) as file_object:
-        _NON_CRITICAL_TOPICS = json.load(file_object)["list"]
-        print(_NON_CRITICAL_TOPICS)
+        substring_exclusion_list = json.load(file_object)["substring_exclusion_list"]
+        print(substring_exclusion_list)
+        return substring_exclusion_list
 
 
 def does_contain_critical_topics(current_topics, non_crucial_list):
@@ -518,7 +521,7 @@ if __name__ == "__main__":
     _PARALLEL_MODE = args.parallel
     _WRITE_TO_BQ = args.write_to_bq
 
-    load_non_critical_topics()
+    _NON_CRITICAL_TOPICS = load_non_critical_topics()
     CURRENT_SESSION_ID = str(uuid.uuid4())
     while _RETRIES_LEFT > 0:
         _RETRIES_LEFT -= 1

@@ -35,8 +35,11 @@ Possible actions:
 
 ## Setup
 
-1. Clone the repository (reach out to eladb@google.com, dvirka@google.com for access to the user-group: https://groups.google.com/a/professional-services.goog/g/solutions_bowling-readers/members)
+1. 
+Visit https://professional-services.googlesource.com/new-password and login with your account
+Once authenticated please copy all lines in the box and paste them in the terminal.
 
+Clone the repository (reach out to eladb@google.com, dvirka@google.com for access to the user-group: https://groups.google.com/a/professional-services.goog/g/solutions_bowling-readers/members)
 ```shell
 git clone https://professional-services.googlesource.com/solutions/bowling
 ```
@@ -93,7 +96,7 @@ python3 main.py -id <ACCUNT_ID>
 * `-ddb`  | `--delete_db`   - Deletes the BQ tables which are relevant to the tool.
 
 ##### [WIP Customization]
-* `-clean_bq` | `--clean_outdated_bq`  -Delete outdated rows in BQ (ads that has `bowling_status = SCANNED` and another newer `bowling_status`).
+* `-clean_bq` | `--clean_outdated_bq`  -Deletes outdated rows in BQ (ads that has `bowling_status = SCANNED` and another newer `bowling_status`).
 
 
 #### Python reminder

@@ -1,2 +1,2 @@
-{"list": ["destination", "font", "capitalization"]
+﻿{"substring_exclusion_list": ["destination", "font", "capitalization", "webmaster"]
 }

@@ -59,13 +59,13 @@ _ADS_TO_REMOVE_TABLE_NAME = "AdsToRemove"
 _PER_ACCOUNT_SUMMARY_TABLE_NAME = "PerAccountSummary"
 _PER_MCC_SUMMARY_TABLE_NAME = "PerMccSummary"
 _OUTPUT_PATH = "../output/"
+_EXCLUDED_TOPICS_FILE = './excluded_topics_substrings.json'
 _CHUNK_SIZE = 5000
 _RETRIES_LEFT = 2
-_EXCLUDED_TOPICS_FILE = './non_critical_topics.json'
+
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s - %(levelname)s] %(message).5000s')
 logging.getLogger('google.ads.googleads.client').setLevel(logging.INFO)
-
 
 
 def create_bq_tables():
@@ -116,6 +116,7 @@ def create_bq_tables():
 
 def main(top_id):
     """Gets all the accounts, logs the crucial disapproved ads and optionally removes them"""
+    top_id = top_id.replace("-","")
     accounts_with_removed_ads = 0
     accounts_without_removed_ads = 0
     top_mcc_total_removed_ads = 0
@@ -363,7 +364,7 @@ def extract_text_from_proto(proto_list):
 
 def load_excluded_topics():
     """Loads topics non crucial list (exclusion list)"""
-    with open(_EXCLUDED_TOPICS_FILE) as file_object:
+    with open(_EXCLUDED_TOPICS_FILE, encoding='utf-8-sig') as file_object:
         substring_exclusion_list = json.load(file_object)["substring_exclusion_list"]
         print(substring_exclusion_list)
         return substring_exclusion_list
@@ -504,13 +505,11 @@ if __name__ == "__main__":
                         help="Runs multiple accounts in parallel.", )
     parser.add_argument("-rm", "--remove_ads", action="store_true",
                         help="Should remove disapproved ads.", )
-    parser.add_argument("-bq", "--write_to_bq", action="store_true", help="Write output to BQ "
-                                                                          "in addition to a local "
-                                                                          "file.", )
+    parser.add_argument("-bq", "--write_to_bq", action="store_true",
+                        help="Write output to BQ in addition to a local file.", )
     parser.add_argument("-ddb", "--delete_db", action="store_true", help="Delete DB tables.", )
-    parser.add_argument("-clean_bq", "--clean_outdated_bq", action="store_true", help="Clean "
-                                                                                      "outdated "
-                                                                             "rows in BQ.", )
+    parser.add_argument("-clean_bq", "--clean_outdated_bq", action="store_true",
+                        help="Clean outdated rows in BQ.", )
 
     args = parser.parse_args()
     _REMOVE_ADS = args.remove_ads

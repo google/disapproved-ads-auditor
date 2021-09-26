@@ -59,17 +59,13 @@ _ADS_TO_REMOVE_TABLE_NAME = "AdsToRemove"
 _PER_ACCOUNT_SUMMARY_TABLE_NAME = "PerAccountSummary"
 _PER_MCC_SUMMARY_TABLE_NAME = "PerMccSummary"
 _OUTPUT_PATH = "../output/"
-
 _CHUNK_SIZE = 5000
 _RETRIES_LEFT = 2
+_EXCLUDED_TOPICS_FILE = './non_critical_topics.json'
 
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s - %(levelname)s] %(message).5000s')
 logging.getLogger('google.ads.googleads.client').setLevel(logging.INFO)
 
-_NON_CRITICAL_TOPICS = [each_string.lower() for each_string in ['Destination', 'format']]
-_DEBUG_SUSPENSION_TOPICS = [each_string.lower() for each_string in ['Destination_not_working']]
-
-_NON_CRITICAL_TOPICS_FILE = './non_critical_topics.json'
 
 
 def create_bq_tables():
@@ -189,7 +185,7 @@ def remove_disapproved_ads_for_account(account):
             ad = ad_group_ad.ad
             policy_summary = ad_group_ad.policy_summary
             current_topics = [entry.topic.lower() for entry in policy_summary.policy_topic_entries]
-            if does_contain_critical_topics(current_topics, _NON_CRITICAL_TOPICS):
+            if has_included_topic(current_topics, _EXCLUDED_TOPIC_SUBSTRINGS):
                 ads_to_remove_count += 1
                 print('** A suspension topic, will be removed')
                 print(f'\ttopics: "{current_topics}"')
@@ -365,26 +361,26 @@ def extract_text_from_proto(proto_list):
     return values
 
 
-def load_non_critical_topics():
+def load_excluded_topics():
     """Loads topics non crucial list (exclusion list)"""
-    with open(_NON_CRITICAL_TOPICS_FILE) as file_object:
+    with open(_EXCLUDED_TOPICS_FILE) as file_object:
         substring_exclusion_list = json.load(file_object)["substring_exclusion_list"]
         print(substring_exclusion_list)
         return substring_exclusion_list
 
 
-def does_contain_critical_topics(current_topics, non_crucial_list):
+def has_included_topic(current_topics, excluded_topic_substrings):
     """Checks if topic list contains a critical topic"""
     for current_topic in current_topics:
-        if is_topic_critical(current_topic, non_crucial_list):
+        if is_included_topic(current_topic, excluded_topic_substrings):
             return True
     return False
 
 
-def is_topic_critical(current_topic, non_crucial_list):
+def is_included_topic(current_topic, excluded_topic_substrings):
     """Checks if a given topic is critical"""
-    for non_crucial in non_crucial_list:
-        if non_crucial in current_topic:
+    for excluded_topic_substring in excluded_topic_substrings:
+        if excluded_topic_substring in current_topic:
             return False
     return True
 
@@ -521,7 +517,7 @@ if __name__ == "__main__":
     _PARALLEL_MODE = args.parallel
     _WRITE_TO_BQ = args.write_to_bq
 
-    _NON_CRITICAL_TOPICS = load_non_critical_topics()
+    _EXCLUDED_TOPIC_SUBSTRINGS = load_excluded_topics()
     CURRENT_SESSION_ID = str(uuid.uuid4())
     while _RETRIES_LEFT > 0:
         _RETRIES_LEFT -= 1

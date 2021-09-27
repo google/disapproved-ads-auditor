@@ -1,1 +1,0 @@
-# bowling-compliance-ads-remover

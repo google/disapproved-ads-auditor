@@ -116,7 +116,7 @@ def create_bq_tables():
 
 def main(top_id):
     """Gets all the accounts, logs the crucial disapproved ads and optionally removes them"""
-    top_id = top_id.replace("-","")
+    top_id = top_id.replace("-", "")
     accounts_with_removed_ads = 0
     accounts_without_removed_ads = 0
     top_mcc_total_removed_ads = 0
@@ -293,8 +293,8 @@ def remove_ads(removal_operations, removal_json, account_id):
     for chunk_index, operations_chuck in enumerate(operations_chucks):
         try:
             response_chunk = send_bulk_mutate_request(account_id, operations_chuck)
-        except GoogleAdsException as ex:
-            handle_googleads_exception(ex)
+        except GoogleAdsException as exception:
+            handle_googleads_exception(exception)
         else:
             # Remove succeeded
             index_array, error_array = _print_results(response_chunk)
@@ -323,7 +323,6 @@ def get_ad_hierarchy(account, campaign_id, ad_group_ad, ad):
 
 def populate_ad_json_mandatory_data(ad_json, ad_group_ad, ad):
     """Populates ad json with 'mandatory_data' """
-    mandatory_data = {}
     if ad.type_.name.upper() == "TEXT_AD":
         mandatory_data = {"ad.text_ad.headline": ad.text_ad.headline,
                           "desc1": ad.text_ad.description1, "desc2": ad.text_ad.description2}
@@ -347,7 +346,7 @@ def populate_ad_json_mandatory_data(ad_json, ad_group_ad, ad):
             "ad_group_ad.ad.responsive_search_ad.path1": ad_group_ad.ad.responsive_search_ad.path1,
             "ad_group_ad.ad.responsive_search_ad.path2": ad_group_ad.ad.responsive_search_ad.path2}
     else:
-        print(ad.type_.name.upper())
+        mandatory_data = {"type": ad.type_.name.upper()}
     ad_json["mandatory_data"] = str(mandatory_data)
 
 
@@ -498,7 +497,7 @@ def create_results_folder(output_path):
 
 
 if __name__ == "__main__":
-    parser = argparse.ArgumentParser(description=("Lists disapproved ads for a given top MCC"))
+    parser = argparse.ArgumentParser(description="Lists disapproved ads for a given top MCC")
     parser.add_argument("-id", "--top_id", type=str, required=True,
                         help="The Google Ads top mcc ID.", )
     parser.add_argument("-p", "--parallel", action="store_true",

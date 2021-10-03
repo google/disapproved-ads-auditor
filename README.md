@@ -1,7 +1,7 @@
-# Bowling - avoid Google's '3 strikes account suspension'
+﻿# Bowling - avoid Google's '3 strikes account suspension'
 
 Starting Sep 21, Google has a new violation policy: when an ad is being disapproved 3 times due to some specific topic violation, Google can suspend a whole account.
-The tool audits (and optionally deletes) the disapproved ads that can cause account suspension [Policy Deatils](https://support.google.com/google-ads/answer/10957124?hl=en).
+The tool audits (and optionally deletes) the disapproved ads that can cause account suspension. See [policy Deatils](https://support.google.com/google-ads/answer/10957124?hl=en).
 
 
 ## Disclaimer
@@ -15,7 +15,13 @@ Contact: eladb@google.com
 
 ## What is it?
 
-A tool to collect all disapproved apps (excluding ads with policy non critical topics from "non_critical_topics.json") in order to avoid account suspension.
+A tool to collect all disapproved apps in order to avoid account suspension.
+
+
+TIP: There is an exclusion sub-string list. Meaning topics which contains on or more of the terms from this list will be considered not dangerous and won’t be removed. You can adjust the list as you wish.
+
+TIP: Excluding ads with policy non critical topics from [non_critical_topics.json](https://github.com/google/bowling-compliance-ads-remover/blob/main/src/excluded_topics_substrings.json))
+
 
 Possible actions:
 - Only audit the ads
@@ -35,16 +41,7 @@ Possible actions:
 
 ## Setup
 
-1. 
-Visit https://professional-services.googlesource.com/new-password and login with your account
-Once authenticated please copy all lines in the box and paste them in the terminal.
-
-Clone the repository (reach out to eladb@google.com, dvirka@google.com for access to the user-group: https://groups.google.com/a/professional-services.goog/g/solutions_bowling-readers/members)
-```shell
-git clone https://professional-services.googlesource.com/solutions/bowling
-```
-
-2. Fill in credentials in "src/secret_keys/google-ads.yaml" file
+1. Fill in credentials in "src/secret_keys/google-ads.yaml" file
 
 ```shell
 ﻿client_customer_id:
@@ -53,26 +50,28 @@ client_secret:
 developer_token:
 login_customer_id:
 refresh_token:
+use_proto_plus: True
 ```
 
+`login_customer_id` is the MCC id see details under `Running` section
 
 
-3. Install google ads API
+2. Install google ads API
 
 ```shell
-pip3 install google-ads==10.0.0
+pip3 install google-ads --upgrade
 ```
 
-4. Install BigQuery API
+3. Install BigQuery API
 
 ```shell
 pip3 install --user --upgrade google-cloud-bigquery
 ```
 
-5. Create a GCP service-account (type: desktop-client) and download its key. See [GCP doc](https://cloud.google.com/docs/authentication/getting-started).
+4. Create a GCP service-account (type: desktop-client) and download its key. See [GCP doc](https://cloud.google.com/docs/authentication/getting-started).
 Give that service-account `bigquery.user` role (`BigQuery Job User`)
 
-6. Set an environment variable:
+5. Set an environment variable:
 
 ```shell
 export GOOGLE_APPLICATION_CREDENTIALS = <YOUR_SERVICE_ACCOUNT_KEY>
@@ -85,6 +84,11 @@ export GOOGLE_APPLICATION_CREDENTIALS = <YOUR_SERVICE_ACCOUNT_KEY>
 ```shell
 python3 main.py -id <ACCUNT_ID>
 ```
+
+* If `<ACCOUNT_ID>` is an MCC, it should appear in the above `google-ads.yaml` file under `login_customer_id:`
+
+* If `<ACCOUNT_ID>` is a single-account, its parent MCC should appear in the above `google-ads.yaml` file under `login_customer_id:`
+
 
 
 #### Customization
@@ -111,6 +115,7 @@ The results will be saved under the "output" folder (and optionally under BQ dat
 
 
  * "AllAccounts" - lists all the subMCC and sub accounts that were scanned
+
 [![all accounts][1]][1]
   
 account_id
@@ -121,9 +126,10 @@ session_id: identifies the last run and join with other tables.
 
 
  * "AdsToRemove" - list all the ads to be removed *including* all the data required for re-uploading the ads (if they were removed).
+
 [![per account][2]][2]
 
- Based on (Google Ads ad_group_ad report)[https://developers.google.com/google-ads/api/fields/v8/ad_group_ad#ad_group_ad.ad.final_urls]
+ Based on [Google Ads ad_group_ad report](https://developers.google.com/google-ads/api/fields/v8/ad_group_ad#ad_group_ad.ad.final_urls)
 - ad_id
 - ad_type
 - ad_group_id
@@ -142,6 +148,7 @@ session_id: identifies the last run and join with other tables.
 
 
  * "PerAccountSummary" - when finished processing an account, it sums the numbers of ads to be removed, ads that have been removed
+
 [![per mcc summary][3]][3]
 
 - account_id
@@ -151,7 +158,9 @@ session_id: identifies the last run and join with other tables.
 
 
  * "PerMccSummary" - similar sums per top-MCC level
+
 [![Ads to remove][4]][4]
+
 - account_id
 - total_sub_accounts: total # of sub accounts.
 - top_mcc_total_ads_to_remove: total # of ads to remove.
@@ -169,10 +178,30 @@ session_id: identifies the last run and join with other tables.
  * Google BQ API allows a built-in retry mechanism (see [BQ query API](https://googleapis.dev/python/bigquery/latest/generated/google.cloud.bigquery.client.Client.html#google.cloud.bigquery.client.Client.query))
 
 
- ## Change history
-See [CHANGELOG](CHANGELOG.md)
- 
- 
+ ## Troubleshoot
+
+```
+ValueError: A required field in the configuration data was not found. The required fields are: ('developer_token',)```
+
+
+```
+ValueError: The client library configuration is missing the required "use_proto_plus" key. Please set this option to either "True" or "False". For more information about this option see the Protobuf Messages guide: https://developer
+s.google.com/google-ads/api/docs/client-libs/python/protobuf-messages
+
+```
+
+* Check you’ve filled the `google-ads.yaml` file correctly
+
+
+```
+Request with ID "XXXXX" failed with status "PERMISSION_DENIED" and includes the following errors:
+        Error with message "User doesn't have permission to access customer. Note: If you're accessing a client customer, the manager's customer id must be set in the 'login-customer-id' header. See https://developers.google.com/goo
+gle-ads/api/docs/concepts/call-structure#cid".
+```
+
+* make sure `login_customer_id :` in the yaml file contains the relevant `MCC id`.
+
+
  ## License
 Apache Version 2.0
 See [LICENSE](LICENSE)

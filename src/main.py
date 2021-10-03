@@ -120,7 +120,8 @@ def main(top_id):
     accounts_with_removed_ads = 0
     accounts_without_removed_ads = 0
     top_mcc_total_removed_ads = 0
-    create_bq_tables()
+    if _WRITE_TO_BQ:
+        create_bq_tables()
     accounts = flat_all_accounts(top_id, str(top_id))
     write_to_file(_ALL_ACCOUNTS_TABLE_NAME, accounts)
     if _WRITE_TO_BQ:
@@ -253,7 +254,8 @@ def get_full_output_path(file_name):
 def write_to_file(file, content):
     """Writes to file"""
     with open(get_full_output_path(file), 'a') as file_object:
-        file_object.write("\n" + json.dumps(content))
+        file_object.write("\n" + json.dumps(content,
+                                            default=lambda x: list(x) if isinstance(x, set) else x))
 
 
 def get_policy_extra(policy_summary):
@@ -489,7 +491,6 @@ def delete_tables():
     bqServiceWrapper.delete_table(_ADS_TO_REMOVE_TABLE_NAME)
     bqServiceWrapper.delete_table(_ALL_ACCOUNTS_TABLE_NAME)
     bqServiceWrapper.delete_table(_PER_ACCOUNT_SUMMARY_TABLE_NAME)
-
 
 def create_results_folder(output_path):
     """Creates results folder"""

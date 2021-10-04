@@ -1,4 +1,5 @@
-﻿# Bowling - avoid Google's '3 strikes account suspension'
+﻿
+# Bowling - avoid Google's '3 strikes account suspension'
 
 Starting Sep 21, Google has a new violation policy: when an ad is being disapproved 3 times due to some specific topic violation, Google can suspend a whole account.
 The tool audits (and optionally deletes) the disapproved ads that can cause account suspension. See [policy Details](https://support.google.com/google-ads/answer/10957124?hl=en).
@@ -18,10 +19,12 @@ Contact: eladb@google.com
 A tool to collect all disapproved apps in order to avoid account suspension.
 
 
-TIP: There is an exclusion sub-string list. Meaning topics which contains on or more of the terms from this list will be considered not dangerous and won’t be removed. You can adjust the list as you wish.
-
-TIP: Excluding ads with policy non critical topics from [non_critical_topics.json](https://github.com/google/bowling-compliance-ads-remover/blob/main/src/excluded_topics_substrings.json))
-
+```
+There is an exclusion sub-string list. Meaning topics which contains on or more of the terms from this list will be considered not dangerous and won’t be removed. You can adjust the list as you wish.
+```
+```
+Excluding ads with policy non critical topics from [non_critical_topics.json](https://github.com/google/bowling-compliance-ads-remover/blob/main/src/excluded_topics_substrings.json))
+```
 
 Possible actions:
 - Only audit the ads
@@ -181,17 +184,14 @@ session_id: identifies the last run and join with other tables.
  ## Troubleshoot
 
 ```
-ValueError: A required field in the configuration data was not found. The required fields are: ('developer_token',)```
-
-
+ValueError: A required field in the configuration data was not found. The required fields are: ('developer_token',)
+```
 ```
 ValueError: The client library configuration is missing the required "use_proto_plus" key. Please set this option to either "True" or "False". For more information about this option see the Protobuf Messages guide: https://developer
 s.google.com/google-ads/api/docs/client-libs/python/protobuf-messages
-
 ```
 
-* Check you’ve filled the `google-ads.yaml` file correctly
-
+* Solution: Check you’ve filled the `google-ads.yaml` file correctly
 
 ```
 Request with ID "XXXXX" failed with status "PERMISSION_DENIED" and includes the following errors:
@@ -199,7 +199,7 @@ Request with ID "XXXXX" failed with status "PERMISSION_DENIED" and includes the 
 gle-ads/api/docs/concepts/call-structure#cid".
 ```
 
-* make sure `login_customer_id :` in the yaml file contains the relevant `MCC id`.
+* Solution: make sure `login_customer_id :` in the yaml file contains the relevant `MCC id`.
 
 
  ## License

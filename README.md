@@ -1,23 +1,13 @@
 ﻿
 # Bowling - avoid Google's '3 strikes account suspension'
 
-Starting Sep 21, Google has a new violation policy: when an ad is being disapproved 3 times due to some specific topic violation, Google can suspend a whole account.
-The tool audits (and optionally deletes) the disapproved ads that can cause account suspension. See [policy Details](https://support.google.com/google-ads/answer/10957124?hl=en).
-
-
-## Disclaimer
-
-**This is not an officially supported Google product.**
-
-Copyright 2021 Google LLC. This solution, including any related sample code or data, is made available on an “as is,” “as available,” and “with all faults” basis, solely for illustrative purposes, and without warranty or representation of any kind. This solution is experimental, unsupported and provided solely for your convenience. Your use of it is subject to your agreements with Google, as applicable, and may constitute a beta feature as defined under those agreements.  To the extent that you make any data available to Google in connection with your use of the solution, you represent and warrant that you have all necessary and appropriate rights, consents and permissions to permit Google to use and process that data.  By using any portion of this solution, you acknowledge, assume and accept all risks, known and unknown, associated with its usage, including with respect to your deployment of any portion of this solution in your systems, or usage in connection with your business, if at all.
-
-
-Contact: eladb@google.com
+Starting Oct 21 Google is introducing a new strike-based system to enforce against advertisers who repeatedly violate Google Ads policies (read more about the change here).
+An advertiser’s first policy violation will only result in a warning. But advertisers will earn their first strike if we detect continued violation of our policies. Advertisers will be able to receive a maximum of three strikes, and the penalties applied with each strike will progressively increase. Temporary account holds will be applied for the first and second strikes, while the third strike will result in an account suspension. 
+Advertisers with hundreds of accounts and billions of search keywords lack the bandwidth to monitor each violation, thus might receive repeated strikes and get suspended.
 
 ## What is it?
 
-A tool to collect all disapproved apps in order to avoid account suspension.
-
+“3 Strikes Bowling” is a tool used to collect all disapproved apps (excluding ads with policy non critical topics from "non_critical_topics.json") in order to avoid account suspension. 
 
 ```
 There is an exclusion sub-string list. Meaning topics which contains on or more of the terms from this list will be considered not dangerous and won’t be removed. You can adjust the list as you wish.
@@ -25,10 +15,10 @@ There is an exclusion sub-string list. Meaning topics which contains on or more 
 ```
 Excluding ads with policy non critical topics from [non_critical_topics.json](https://github.com/google/bowling-compliance-ads-remover/blob/main/src/excluded_topics_substrings.json))
 ```
-
-Possible actions:
-- Only audit the ads
-- Audit and remove the ads
+It’s a simple Python script, which can be run in either of the following modes:
+* “Audit Mode”- export all the disapproved ads without deleting them;
+* “Remove Mode” - delete all the disapproved ads and log the disapproved ads’ details. .
+There are a few output files (see here) which are saved locally under the “output” folder and optionally on BigQuery as well (“google_3_strikes” dataset).
 
 
 ## Requirements
@@ -202,7 +192,22 @@ gle-ads/api/docs/concepts/call-structure#cid".
 * Solution: make sure `login_customer_id :` in the yaml file contains the relevant `MCC id`.
 
 
- ## License
+## Disclaimer
+
+**This is not an officially supported Google product.**
+Copyright 2021 Google LLC. This solution, including any related sample code or data, is made available on an “as is,” “as available,” and “with all faults” basis, solely for illustrative purposes, and without warranty or representation of any kind. This solution is experimental, unsupported and provided solely for your convenience. Your use of it is subject to your agreements with Google, as applicable, and may constitute a beta feature as defined under those agreements.  To the extent that you make any data available to Google in connection with your use of the solution, you represent and warrant that you have all necessary and appropriate rights, consents and permissions to permit Google to use and process that data.  By using any portion of this solution, you acknowledge, assume and accept all risks, known and unknown, associated with its usage, including with respect to your deployment of any portion of this solution in your systems, or usage in connection with your business, if at all.
+
+
+
+# Project owners 
+nkal@google.com 
+cyogev@google.com
+dvirka@google.com
+Dev: eladb@google.com
+
+
+
+## License
 Apache Version 2.0
 See [LICENSE](LICENSE)
 

@@ -438,8 +438,8 @@ def _print_results(response):
 
         for error_detail in error_details:
             # Retrieve an instance of the google_ads_failure class from the client
-            failure_message = gAdsServiceWrapper.client.get_type("google_ads_failure")
-            # Parse the string into a google_ads_failure message instance.
+            failure_message = gAdsServiceWrapper.client.get_type("GoogleAdsFailure")
+            # Parse the string into a GoogleAdsFailure message instance.
             # To access class-only methods on the message we retrieve its type.
             google_ads_failure = type(failure_message)
             failure_object = google_ads_failure.deserialize(error_detail.value)
@@ -466,7 +466,6 @@ def _print_results(response):
         if not message:
             continue
         print(f"Removed ad group ad with resource_name: {message.resource_name}.")
-
     return index_array, error_array
 
 

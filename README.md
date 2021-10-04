@@ -1,7 +1,7 @@
 ﻿# Bowling - avoid Google's '3 strikes account suspension'
 
 Starting Sep 21, Google has a new violation policy: when an ad is being disapproved 3 times due to some specific topic violation, Google can suspend a whole account.
-The tool audits (and optionally deletes) the disapproved ads that can cause account suspension. See [policy Deatils](https://support.google.com/google-ads/answer/10957124?hl=en).
+The tool audits (and optionally deletes) the disapproved ads that can cause account suspension. See [policy Details](https://support.google.com/google-ads/answer/10957124?hl=en).
 
 
 ## Disclaimer
@@ -82,7 +82,7 @@ export GOOGLE_APPLICATION_CREDENTIALS = <YOUR_SERVICE_ACCOUNT_KEY>
 1. To run the tool for all accounts under MCC, run the main script with the -id (account_id) flag:
 
 ```shell
-python3 main.py -id <ACCUNT_ID>
+python3 main.py -id <ACCOUNT_ID>
 ```
 
 * If `<ACCOUNT_ID>` is an MCC, it should appear in the above `google-ads.yaml` file under `login_customer_id:`
@@ -117,7 +117,7 @@ The results will be saved under the "output" folder (and optionally under BQ dat
  * "AllAccounts" - lists all the subMCC and sub accounts that were scanned
 
 [![all accounts][1]][1]
-  
+
 account_id
 hierarchy: Mcc_SubMcc_SubAccount.
 timestamp: when scanning all the sub accounts finished.

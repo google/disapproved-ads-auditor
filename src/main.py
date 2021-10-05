@@ -63,7 +63,6 @@ _EXCLUDED_TOPICS_FILE = './excluded_topics_substrings.json'
 _CHUNK_SIZE = 5000
 _RETRIES_LEFT = 2
 
-
 logging.basicConfig(level=logging.INFO, format='[%(asctime)s - %(levelname)s] %(message).5000s')
 logging.getLogger('google.ads.googleads.client').setLevel(logging.INFO)
 
@@ -254,8 +253,8 @@ def get_full_output_path(file_name):
 def write_to_file(file, content):
     """Writes to file"""
     with open(get_full_output_path(file), 'a') as file_object:
-        file_object.write("\n" + json.dumps(content,
-                                            default=lambda x: list(x) if isinstance(x, set) else x))
+        file_object.write(
+            "\n" + json.dumps(content, default=lambda x: list(x) if isinstance(x, set) else x))
 
 
 def get_policy_extra(policy_summary):
@@ -453,7 +452,8 @@ def _print_results(response):
                       f"\nError message: {error.message}\nError code: "
                       f"{error.error_code}")
                 index_array.append(error.location.field_path_elements[0].index)
-                error_array.append({"error_message": error.message, "error_code": error.error_code})
+                error_array.append(
+                    {"error_message": str(error.message), "error_code": str(error.error_code)})
     else:
         print("All operations completed successfully. No partial failure "
               "to show.")
@@ -490,6 +490,7 @@ def delete_tables():
     bqServiceWrapper.delete_table(_ADS_TO_REMOVE_TABLE_NAME)
     bqServiceWrapper.delete_table(_ALL_ACCOUNTS_TABLE_NAME)
     bqServiceWrapper.delete_table(_PER_ACCOUNT_SUMMARY_TABLE_NAME)
+
 
 def create_results_folder(output_path):
     """Creates results folder"""

@@ -1,20 +1,29 @@
 ﻿
-# Bowling - avoid Google's '3 strikes account suspension'
+# Bowling - saves advertisers from Google's 3-strike account suspension
 
 Starting Oct 21 Google is introducing a new strike-based system to enforce against advertisers who repeatedly violate Google Ads policies (read more about the change here).
 An advertiser’s first policy violation will only result in a warning. But advertisers will earn their first strike if we detect continued violation of our policies. Advertisers will be able to receive a maximum of three strikes, and the penalties applied with each strike will progressively increase. Temporary account holds will be applied for the first and second strikes, while the third strike will result in an account suspension. 
 Advertisers with hundreds of accounts and billions of search keywords lack the bandwidth to monitor each violation, thus might receive repeated strikes and get suspended.
 
+# Project owners 
+- nkal@google.com 
+- cyogev@google.com
+- dvirka@google.com
+- Dev: eladb@google.com
+
+
+## Disclaimer
+
+**This is not an officially supported Google product.**
+Copyright 2021 Google LLC. This solution, including any related sample code or data, is made available on an “as is,” “as available,” and “with all faults” basis, solely for illustrative purposes, and without warranty or representation of any kind. This solution is experimental, unsupported and provided solely for your convenience. Your use of it is subject to your agreements with Google, as applicable, and may constitute a beta feature as defined under those agreements.  To the extent that you make any data available to Google in connection with your use of the solution, you represent and warrant that you have all necessary and appropriate rights, consents and permissions to permit Google to use and process that data.  By using any portion of this solution, you acknowledge, assume and accept all risks, known and unknown, associated with its usage, including with respect to your deployment of any portion of this solution in your systems, or usage in connection with your business, if at all.
+
+
 ## What is it?
 
-“3 Strikes Bowling” is a tool used to collect all disapproved apps (excluding ads with policy non critical topics from "non_critical_topics.json") in order to avoid account suspension. 
+**3 Strikes Bowling** is a tool used to collect all disapproved apps (excluding ads with policy non critical topics from "non_critical_topics.json") in order to avoid account suspension. 
+- There is an exclusion sub-string list. Meaning topics which contains on or more of the terms from this list will be considered not dangerous and won’t be removed. You can adjust the list as you wish.
+- Excluding ads with policy non critical topics from [non_critical_topics.json](https://github.com/google/bowling-compliance-ads-remover/blob/main/src/excluded_topics_substrings.json))
 
-```
-There is an exclusion sub-string list. Meaning topics which contains on or more of the terms from this list will be considered not dangerous and won’t be removed. You can adjust the list as you wish.
-```
-```
-Excluding ads with policy non critical topics from [non_critical_topics.json](https://github.com/google/bowling-compliance-ads-remover/blob/main/src/excluded_topics_substrings.json))
-```
 It’s a simple Python script, which can be run in either of the following modes:
 * “Audit Mode”- export all the disapproved ads without deleting them;
 * “Remove Mode” - delete all the disapproved ads and log the disapproved ads’ details. .
@@ -173,9 +182,11 @@ session_id: identifies the last run and join with other tables.
 
  ## Troubleshoot
 
+1. 
 ```
 ValueError: A required field in the configuration data was not found. The required fields are: ('developer_token',)
 ```
+or
 ```
 ValueError: The client library configuration is missing the required "use_proto_plus" key. Please set this option to either "True" or "False". For more information about this option see the Protobuf Messages guide: https://developer
 s.google.com/google-ads/api/docs/client-libs/python/protobuf-messages
@@ -183,6 +194,7 @@ s.google.com/google-ads/api/docs/client-libs/python/protobuf-messages
 
 * Solution: Check you’ve filled the `google-ads.yaml` file correctly
 
+2. 
 ```
 Request with ID "XXXXX" failed with status "PERMISSION_DENIED" and includes the following errors:
         Error with message "User doesn't have permission to access customer. Note: If you're accessing a client customer, the manager's customer id must be set in the 'login-customer-id' header. See https://developers.google.com/goo
@@ -192,26 +204,9 @@ gle-ads/api/docs/concepts/call-structure#cid".
 * Solution: make sure `login_customer_id :` in the yaml file contains the relevant `MCC id`.
 
 
-## Disclaimer
-
-**This is not an officially supported Google product.**
-Copyright 2021 Google LLC. This solution, including any related sample code or data, is made available on an “as is,” “as available,” and “with all faults” basis, solely for illustrative purposes, and without warranty or representation of any kind. This solution is experimental, unsupported and provided solely for your convenience. Your use of it is subject to your agreements with Google, as applicable, and may constitute a beta feature as defined under those agreements.  To the extent that you make any data available to Google in connection with your use of the solution, you represent and warrant that you have all necessary and appropriate rights, consents and permissions to permit Google to use and process that data.  By using any portion of this solution, you acknowledge, assume and accept all risks, known and unknown, associated with its usage, including with respect to your deployment of any portion of this solution in your systems, or usage in connection with your business, if at all.
-
-
-
-# Project owners 
-nkal@google.com 
-cyogev@google.com
-dvirka@google.com
-Dev: eladb@google.com
-
-
-
 ## License
 Apache Version 2.0
 See [LICENSE](LICENSE)
-
-
 
 
   [1]: https://i.stack.imgur.com/9osCD.png

@@ -21,9 +21,24 @@ Copyright 2021 Google LLC. This solution, including any related sample code or d
 
 ## What is it?
 
-**3 Strikes Bowling** is a tool used to collect all disapproved apps (excluding ads with policy non critical topics from "non_critical_topics.json") in order to avoid account suspension. 
-- There is an exclusion sub-string list. Meaning topics which contains on or more of the terms from this list will be considered not dangerous and won’t be removed. You can adjust the list as you wish.
-- Excluding ads with policy non critical topics from [non_critical_topics.json](https://github.com/google/bowling-compliance-ads-remover/blob/main/src/excluded_topics_substrings.json))
+**3 Strikes Bowling** is a tool used to collect all disapproved apps (taking into account `inclusion_topics_list` and `exclusion_topics_list` [here](https://github.com/google/bowling-compliance-ads-remover/blob/main/src/topics_substrings.json)) in order to avoid account suspension. 
+- There are `inclusion substrings list` and `exclusion substrings list` (please check and fill them as you see).
+- If the inclusion list is empty the code uses the exclusion list.
+- Only one of the two should be filled.
+
+```
+Example A:
+inclusion: [drags, weapon] - any ad with a policy topic that contains any of the words"drags" or "weapon" should be removed.
+exclusion: []
+
+Example B:
+inclusion: []
+exclusion: [destination] - any ad which has only topics that contains the word "destination" should be skipped and not removed.
+```
+
+
+ You can adjust the lists as you wish.
+- Excluding ads with policy non critical topics from [topics_substrings.json](https://github.com/google/bowling-compliance-ads-remover/blob/main/src/topics_substrings.json))
 
 It’s a simple Python script, which can be run in either of the following modes:
 * “Audit Mode”- export all the disapproved ads without deleting them;

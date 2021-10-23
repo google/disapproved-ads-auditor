@@ -59,7 +59,7 @@ _ADS_TO_REMOVE_TABLE_NAME = "AdsToRemove"
 _PER_ACCOUNT_SUMMARY_TABLE_NAME = "PerAccountSummary"
 _PER_MCC_SUMMARY_TABLE_NAME = "PerMccSummary"
 _OUTPUT_PATH = "../output/"
-_EXCLUDED_TOPICS_FILE = './excluded_topics_substrings.json'
+_TOPICS_FILE = './topics_substrings.json'
 _CHUNK_SIZE = 5000
 _RETRIES_LEFT = 2
 
@@ -186,7 +186,8 @@ def remove_disapproved_ads_for_account(account):
             ad = ad_group_ad.ad
             policy_summary = ad_group_ad.policy_summary
             current_topics = [entry.topic.lower() for entry in policy_summary.policy_topic_entries]
-            if has_included_topic(current_topics, _EXCLUDED_TOPIC_SUBSTRINGS):
+            if has_included_topic(current_topics, _INCLIDED_TOPICS_SUBSTRINGS,
+                                  _EXCLUDED_TOPICS_SUBSTRINGS):
                 ads_to_remove_count += 1
                 print('** A suspension topic, will be removed')
                 print(f'\ttopics: "{current_topics}"')
@@ -362,28 +363,37 @@ def extract_text_from_proto(proto_list):
     return values
 
 
+def load_included_topics():
+    """Loads topics non crucial list (exclusion list)"""
+    with open(_TOPICS_FILE, encoding='utf-8-sig') as file_object:
+        substring_inclusion_list = json.load(file_object)["only_these_substrings"]
+        print(substring_inclusion_list)
+        return substring_inclusion_list
+
+
 def load_excluded_topics():
     """Loads topics non crucial list (exclusion list)"""
-    with open(_EXCLUDED_TOPICS_FILE, encoding='utf-8-sig') as file_object:
-        substring_exclusion_list = json.load(file_object)["substring_exclusion_list"]
+    with open(_TOPICS_FILE, encoding='utf-8-sig') as file_object:
+        substring_exclusion_list = json.load(file_object)["anything_but_these_substrings"]
         print(substring_exclusion_list)
         return substring_exclusion_list
 
 
-def has_included_topic(current_topics, excluded_topic_substrings):
-    """Checks if topic list contains a critical topic"""
+def has_included_topic(current_topics, inclusion_topics_substrings, exclusion_topics_substrings):
+    """Checks if the topic list contains a critical topic"""
     for current_topic in current_topics:
-        if is_included_topic(current_topic, excluded_topic_substrings):
+        if is_included_topic(current_topic, inclusion_topics_substrings, True) or is_included_topic(
+            current_topic, exclusion_topics_substrings, False):
             return True
     return False
 
 
-def is_included_topic(current_topic, excluded_topic_substrings):
+def is_included_topic(current_topic, topics_substrings, isInclusionList):
     """Checks if a given topic is critical"""
-    for excluded_topic_substring in excluded_topic_substrings:
-        if excluded_topic_substring in current_topic:
-            return False
-    return True
+    for topic_substring in topics_substrings:
+        if topic_substring in current_topic:
+            return isInclusionList
+    return not isInclusionList
 
 
 def build_ad_removal_sync_operation(account_id, ad_group_id, ad_id):
@@ -516,7 +526,9 @@ if __name__ == "__main__":
     _PARALLEL_MODE = args.parallel
     _WRITE_TO_BQ = args.write_to_bq
 
-    _EXCLUDED_TOPIC_SUBSTRINGS = load_excluded_topics()
+    _INCLUDED_TOPICS_SUBSTRINGS = load_included_topics()
+    _EXCLUDED_TOPICS_SUBSTRINGS = [] if len(
+        _INCLUDED_TOPICS_SUBSTRINGS) == 0 else load_excluded_topics()
     CURRENT_SESSION_ID = str(uuid.uuid4())
     while _RETRIES_LEFT > 0:
         _RETRIES_LEFT -= 1

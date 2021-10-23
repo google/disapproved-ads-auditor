@@ -1,0 +1,4 @@
+﻿{
+"only_these_substrings": [],
+"anything_but_these_substrings": ["destination", "font", "capitalization", "webmaster"]
+}

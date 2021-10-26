@@ -511,7 +511,7 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description="Lists disapproved ads for a given top MCC")
     parser.add_argument("-id", "--top_id", type=str, required=True,
                         help="The Google Ads top mcc ID.", )
-    parser.add_argument("-p", "--parallel", action="store_true",
+    parser.add_argument("-seq", "--sequential", action="store_true",
                         help="Runs multiple accounts in parallel.", )
     parser.add_argument("-rm", "--remove_ads", action="store_true",
                         help="Should remove disapproved ads.", )
@@ -523,7 +523,7 @@ if __name__ == "__main__":
 
     args = parser.parse_args()
     _REMOVE_ADS = args.remove_ads
-    _PARALLEL_MODE = args.parallel
+    _PARALLEL_MODE = not args.sequential
     _WRITE_TO_BQ = args.write_to_bq
 
     _INCLUDED_TOPICS_SUBSTRINGS = load_included_topics()

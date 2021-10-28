@@ -1,12 +1,12 @@
 ﻿
-# Bowling - saves advertisers from Google's 3-strike account suspension
+# Bowling - helps advertisers prepare for Google's Account Strike Policy Enforcement potentially leading to Account Suspension
 
-In light of the [new policy](https://support.google.com/google-ads/answer/10957124?hl=en) that might cause accounts suspension, Bowling is a mitigation tool which allows clients to act and remove disapproved ads before risking account suspension. Advertisers with hundreds of accounts and billions of search keywords lack the bandwidth to monitor each violation, thus might receive repeated strikes and get suspended.
+In light of the [new policy](https://support.google.com/google-ads/answer/10957124?hl=en) that might cause accounts suspension, Bowling is a mitigation tool to surface and optionally remove disapproved ads (user can set which policies to include/exclude) which pose a risk to the account (third strike results in suspension). Advertisers with hundreds of accounts and millions of search ads lack the bandwidth to monitor each violation, and may receive repeated strikes resulting ultimately in suspension.
 
 
 ### The policy ###
-Starting Oct 21 Google is introducing a new strike-based system to enforce against advertisers who repeatedly violate Google Ads policies (read more about the change here).
-An advertiser’s first policy violation will only result in a warning. But advertisers will earn their first strike if we detect continued violation of our policies. Advertisers will be able to receive a maximum of three strikes, and the penalties applied with each strike will progressively increase. Temporary account holds will be applied for the first and second strikes, while the third strike will result in an account suspension. 
+Starting Nov 21 Google is rolling out a new strike-based system to enforce against advertisers who repeatedly violate Google Ads policies (read more about the change here).
+An advertiser’s first policy violation will only result in a warning. But advertisers will earn their first strike if Google detects continued violation of its policies. Advertisers will be given a maximum of three strikes. Each strike will result in a progressively increasing penalty including temporary suspension (1st and 2nd strike) and ultimately final account suspension (3rd strike)
 
 
 # Project owners 

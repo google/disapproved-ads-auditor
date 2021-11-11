@@ -234,3 +234,11 @@ gle-ads/api/docs/concepts/call-structure#cid".
 ## License
 Apache Version 2.0
 See [LICENSE](LICENSE)
+
+
+  [1]: https://i.stack.imgur.com/9osCD.png
+  [2]: https://i.stack.imgur.com/TdaxX.png
+  [3]: https://i.stack.imgur.com/vHRrA.png
+  [4]: https://i.stack.imgur.com/zistH.png
+  [5]: https://i.stack.imgur.com/rZltv.png
+  [6]: https://i.stack.imgur.com/Ip7EO.png

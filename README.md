@@ -22,7 +22,7 @@ Copyright 2021 Google LLC. This solution, including any related sample code or d
 
 
 ## Run modes
-Bowling is a python command-line tool that can run in one of the following modes:
+\ is a python command-line tool that can run in one of the following modes:
 * “Audit Only Mode”- export the relevant ads without deleting them;
 * “Audit + Remove Mode” - export and delete the relevant ads.
 There are a few output files (see here) which are saved locally under the “output” folder and optionally on BigQuery as well (“dissaproved_ads_auditor” dataset).
@@ -33,10 +33,10 @@ There are a few output files (see here) which are saved locally under the “out
 
 ## Selecting the relevant policies
 
-- This [json](https://github.com/google/bowling-compliance-ads-remover/blob/main/src/topics_substrings.json) contains two lists.
-- Make both of the lists empty if you want to audit/remove all policies.
-- Please fill only the first list if you want to cherrypick the relevant policies.
-- Please fill only the second list if you want to cherrypick the non-relevant policies.
+- This [json](https://github.com/google/disapproved-ads-auditor/blob/main/src/topics_substrings.json)disapproved-ads-auditor contains two lists.
+- Leave both lists empty if you want to audit ads labeled with all policy labels.
+- Fill out the first list if you want to hand pick only relevant policies.
+- Fill out the second list if you want to hand pick policies to be excluded from the audit.
 
 
 ```
@@ -165,11 +165,11 @@ session_id: identifies the last run and join with other tables.
 - policy_topics
 - evidences
 - mandatory_data
-- timestamp: when the `bowling_status` was set.
-- bowling_status: `SCANNED`, `REMOVED`, `FAILED_TO_REMOVE`. Another row is usually added for status change instead of being updated.
+- timestamp: when the `audited_status` was set.
+- audited_status: `SCANNED`, `REMOVED`, `FAILED_TO_REMOVE`. Another row is usually added for status change instead of being updated.
 - account_id
 - session_id: identifies the last run and join with other tables.
-- removal_error: Google server error in case `bowling_status = FAILED_TO_REMOVE`
+- removal_error: Google server error in case `audited_status = FAILED_TO_REMOVE`
 
 
 
@@ -234,12 +234,3 @@ gle-ads/api/docs/concepts/call-structure#cid".
 ## License
 Apache Version 2.0
 See [LICENSE](LICENSE)
-
-
-  [1]: https://i.stack.imgur.com/9osCD.png
-  [2]: https://i.stack.imgur.com/TdaxX.png
-  [3]: https://i.stack.imgur.com/vHRrA.png
-  [4]: https://i.stack.imgur.com/zistH.png
-  [5]: https://i.stack.imgur.com/rZltv.png
-  [6]: https://i.stack.imgur.com/Ip7EO.png
-

@@ -5,8 +5,9 @@ Advertisers operating at scale need a scalable solution to review policy violati
 The tool is used to review at scale all disapproved ads across advertisers’ accounts in order to allow advertisers to proactively audit their account at scale and take learnings from the results (how to reduce submission of ads potentially violating Google Ads Policies).
 
 The tool is based on a Python script, which can be run in either of the following modes:
-“Audit Mode”- export an output of disapproved ads across your accounts
-“Remove Mode” - deletes disapproved ads and logs their details
+
+- “Audit Mode”- export an output of disapproved ads across your accounts
+- “Remove Mode” - deletes disapproved ads and logs their details
 
 # Project owners 
 - nkal@google.com 
@@ -24,7 +25,7 @@ Copyright 2021 Google LLC. This solution, including any related sample code or d
 Bowling is a python command-line tool that can run in one of the following modes:
 * “Audit Only Mode”- export the relevant ads without deleting them;
 * “Audit + Remove Mode” - export and delete the relevant ads.
-There are a few output files (see here) which are saved locally under the “output” folder and optionally on BigQuery as well (“google_3_strikes” dataset).
+There are a few output files (see here) which are saved locally under the “output” folder and optionally on BigQuery as well (“dissaproved_ads_auditor” dataset).
 
 
 ![Diagram of The tool's functionality](./src/AdsReviewerTool.png)

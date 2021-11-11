@@ -33,7 +33,7 @@ There are a few output files (see here) which are saved locally under the “out
 
 ## Selecting the relevant policies
 
-- This [json](https://github.com/google/disapproved-ads-auditor/blob/main/src/topics_substrings.json)disapproved-ads-auditor contains two lists.
+- This [json](https://github.com/google/disapproved-ads-auditor/blob/main/src/topics_substrings.json) contains two lists used by the disapproved-ads-auditor tool.
 - Leave both lists empty if you want to audit ads labeled with all policy labels.
 - Fill out the first list if you want to hand pick only relevant policies.
 - Fill out the second list if you want to hand pick policies to be excluded from the audit.

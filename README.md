@@ -66,7 +66,7 @@ exclusion: [destination] - any ad which has only topics that contains the word "
 1. Using the tokens and keys from the above section, fill them in "src/secret_keys/google-ads.yaml" file
 
 ```shell
-﻿client_customer_id:
+client_customer_id:
 client_id:
 client_secret:
 developer_token:
@@ -135,7 +135,7 @@ python3 main.py -id <ACCOUNT_ID> -rm
 ## Output schemas (CSV in local files / tables on BQ)
 
 - Local result files, are under "output" folder.
-- Under BQ dataset "google_3_strikes" (optional).
+- Under BQ dataset "disapproved-ads-auditor" (optional).
 
 
  ### "AllAccounts"

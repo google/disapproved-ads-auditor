@@ -53,8 +53,7 @@ exclusion: [destination] - any ad which has only topics that contains the word "
 ## Getting the keys/tokens
 
 - Python 3.9+
-- Google Ads API Token (
-  [apply for access to the AdWords API](https://developers.google.com/adwords/api/docs/guides/signup)).
+- [Google Ads API Token] (https://developers.google.com/google-ads/api/docs/first-call/dev-token).
 - OAuth 2 Credentials(refer to
   [Generate OAuth2 credentials](https://developers.google.com/adwords/api/docs/guides/authentication#generate_oauth2_credentials)).
 - [Enable Google ads API](https://developers.google.com/google-ads/api/docs/first-call/oauth-cloud-project#enable_the_in_your_project)

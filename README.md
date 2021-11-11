@@ -1,13 +1,12 @@
-﻿
-# Bowling - helps advertisers prepare for Google's Account Strike Policy Enforcement potentially leading to Account Suspension
+# Disapproved Ads Auditor - a scaled ad auditing tool
 
-In light of the [new policy](https://support.google.com/google-ads/answer/10957124?hl=en) that might cause accounts suspension, Bowling is a mitigation tool to surface and optionally remove disapproved ads (user can set which policies to include/exclude) which pose a risk to the account (third strike results in suspension). Advertisers with hundreds of accounts and millions of search ads lack the bandwidth to monitor each violation, and may receive repeated strikes resulting ultimately in suspension.
+Advertisers operating at scale need a scalable solution to review policy violating ads across their accounts so they can ensure compliance with Google’s Ad Policies. As Google introduces more policies and enforcement mechanisms, advertisers need to continue checking their accounts to ensure they comply with Google’s Ads Policies.
 
+The tool is used to review at scale all disapproved ads across advertisers’ accounts in order to allow advertisers to proactively audit their account at scale and take learnings from the results (how to reduce submission of ads potentially violating Google Ads Policies).
 
-### The policy ###
-Starting Nov 21 Google is rolling out a new strike-based system to enforce against advertisers who repeatedly violate Google Ads policies (read more about the change here).
-An advertiser’s first policy violation will only result in a warning. But advertisers will earn their first strike if Google detects continued violation of its policies. Advertisers will be given a maximum of three strikes. Each strike will result in a progressively increasing penalty including temporary suspension (1st and 2nd strike) and ultimately final account suspension (3rd strike)
-
+The tool is based on a Python script, which can be run in either of the following modes:
+“Audit Mode”- export an output of disapproved ads across your accounts
+“Remove Mode” - deletes disapproved ads and logs their details
 
 # Project owners 
 - nkal@google.com 
@@ -20,8 +19,6 @@ An advertiser’s first policy violation will only result in a warning. But adve
 **This is not an officially supported Google product.**
 Copyright 2021 Google LLC. This solution, including any related sample code or data, is made available on an “as is,” “as available,” and “with all faults” basis, solely for illustrative purposes, and without warranty or representation of any kind. This solution is experimental, unsupported and provided solely for your convenience. Your use of it is subject to your agreements with Google, as applicable, and may constitute a beta feature as defined under those agreements.  To the extent that you make any data available to Google in connection with your use of the solution, you represent and warrant that you have all necessary and appropriate rights, consents and permissions to permit Google to use and process that data.  By using any portion of this solution, you acknowledge, assume and accept all risks, known and unknown, associated with its usage, including with respect to your deployment of any portion of this solution in your systems, or usage in connection with your business, if at all.
 
-[![Logo][5]][5]
-
 
 ## Run modes
 Bowling is a python command-line tool that can run in one of the following modes:
@@ -30,25 +27,25 @@ Bowling is a python command-line tool that can run in one of the following modes
 There are a few output files (see here) which are saved locally under the “output” folder and optionally on BigQuery as well (“google_3_strikes” dataset).
 
 
-[![diagram][6]][6]
+![Diagram of The tool's functionality](./src/AdsReviewerTool.png)
 
 
-## Selecting the relevant topics
+## Selecting the relevant policies
 
 - This [json](https://github.com/google/bowling-compliance-ads-remover/blob/main/src/topics_substrings.json) contains two lists.
 - Make both of the lists empty if you want to audit/remove all policies.
-- Please fill only the first list if you want to cherry pick the relevant topics.
-- Please fill only the seconf list if you want to cherry pick the non-relevant topics.
+- Please fill only the first list if you want to cherrypick the relevant policies.
+- Please fill only the second list if you want to cherrypick the non-relevant policies.
 
 
 ```
 Example A:
-inclusion: [drags, weapon] - any ad with a policy topic that contains any of the words"drags" or "weapon" should be removed.
+inclusion: [drugs, weapons] - any ad with a policy topic that contains any of the words "drugs" or "weapons" to be audited and / or removed.
 exclusion: []
 
 Example B:
 inclusion: []
-exclusion: [destination] - any ad which has only topics that contains the word "destination" should be skipped and not removed.
+exclusion: [destination] - any ad which has only topics that contains the word "destination" should be skipped and not audited and / or removed.
 ```
 
 

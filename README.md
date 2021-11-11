@@ -22,7 +22,7 @@ Copyright 2021 Google LLC. This solution, including any related sample code or d
 
 
 ## Run modes
-\ is a python command-line tool that can run in one of the following modes:
+disapproved-ads-auditor tool is a python command-line tool that can run in one of the following modes:
 * “Audit Only Mode”- export the relevant ads without deleting them;
 * “Audit + Remove Mode” - export and delete the relevant ads.
 There are a few output files (see here) which are saved locally under the “output” folder and optionally on BigQuery as well (“dissaproved_ads_auditor” dataset).

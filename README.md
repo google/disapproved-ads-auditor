@@ -52,13 +52,31 @@ exclusion: [destination] - any ad which has only topics that contains the word "
 
 ## Getting the keys/tokens
 
-- Python 3.9+
-- [Google Ads API Token] (https://developers.google.com/google-ads/api/docs/first-call/dev-token).
-- OAuth 2 Credentials(refer to
-  [Generate OAuth2 credentials](https://developers.google.com/adwords/api/docs/guides/authentication#generate_oauth2_credentials)).
-- [Enable Google ads API](https://developers.google.com/google-ads/api/docs/first-call/oauth-cloud-project#enable_the_in_your_project)
-- Generate Refresh Token (refer to
-  [Generate refresh token](https://developers.google.com/google-ads/api/docs/client-libs/python/oauth-desktop#step_3_-_generating_a_refresh_token))
+Follow the below text, or this [official video](https://www.youtube.com/watch?v=2GWx6jI7Ib4) or [non-official video](https://docs.google.com/presentation/d/1e8PPTTlcBTnwiqUuX3_ll_lgBO3MvgrkGgosj1tf5Lg/edit?usp=sharing)
+
+    1.1. [Get Google Ads Developer Token](https://developers.google.com/google-ads/api/docs/first-call/dev-token). Add developer token id to `google-ads.yaml` file.
+
+    1.2. [Generate OAuth2 credentials for **desktop application**](https://developers.google.com/adwords/api/docs/guides/authentication#generate_oauth2_credentials)
+    * Click the download icon next to the credentials that you just created and save file to your computer
+    *  Add client_id and client_secret value to `google-ads.yaml` file
+
+    1.3. Download python source file to perform desktop authentication
+
+    ```
+    curl -0 https://raw.githubusercontent.com/googleads/google-ads-python/868bf36689f1ca4310bdead9c46eed61b8ad1d11/examples/authentication/authenticate_in_desktop_application.py
+    ```
+
+    1.4. Run desktop authentication with downloaded credentials file:
+    ```
+    python authenticate_in_desktop_application.py --client_secrets_path=/path/to/secrets.json
+    ```
+    * Copy generated refresh token and add it to `google-ads.yaml` file.
+
+    1.5. [Enable Google Ads API in your project](https://developers.google.com/google-ads/api/docs/first-call/oauth-cloud-project#enable_the_in_your_project)
+
+    1.6. Add login_customer_id and client_customer_id (MMC under which Developer token was generated) to `google-ads.yaml`. **ID should be in 11111111 format, do not add dashes as separator**.
+
+
 
 ## Setup
 
@@ -82,6 +100,7 @@ pip3 install google-ads --upgrade
 
 
 ### steps 3-5 are optional: save audit to BQ in addition to local files
+
 3. Install BigQuery API
 
 ```shell
@@ -106,13 +125,13 @@ export GOOGLE_APPLICATION_CREDENTIALS = <YOUR_SERVICE_ACCOUNT_KEY>
 python3 main.py -id <ACCOUNT_ID>
 ```
 
-### How to fill `google-ads.yaml` \ `login_customer_id:` field
+##### How to fill `google-ads.yaml` \ `login_customer_id:` field
 A. If `<ACCOUNT_ID>` is an MCC, it should appear in this field.
 B. If `<ACCOUNT_ID>` is a single-account, its parent MCC should appear this field.
 
 
 
-#### Flags
+### Flags
 ```shell
 python3 main.py -id <ACCOUNT_ID> -rm
 ```

@@ -9,11 +9,16 @@ The tool is based on a Python script, which can be run in either of the followin
 - “Audit Mode”- export an output of disapproved ads across your accounts
 - “Remove Mode” - deletes disapproved ads and logs their details
 
+
+</br>
+
 # Project owners 
 - nkal@google.com 
 - cyogev@google.com
 - dvirka@google.com
 - Dev: eladb@google.com
+
+</br>
 
 ## Disclaimer
 
@@ -21,7 +26,10 @@ The tool is based on a Python script, which can be run in either of the followin
 Copyright 2021 Google LLC. This solution, including any related sample code or data, is made available on an “as is,” “as available,” and “with all faults” basis, solely for illustrative purposes, and without warranty or representation of any kind. This solution is experimental, unsupported and provided solely for your convenience. Your use of it is subject to your agreements with Google, as applicable, and may constitute a beta feature as defined under those agreements.  To the extent that you make any data available to Google in connection with your use of the solution, you represent and warrant that you have all necessary and appropriate rights, consents and permissions to permit Google to use and process that data.  By using any portion of this solution, you acknowledge, assume and accept all risks, known and unknown, associated with its usage, including with respect to your deployment of any portion of this solution in your systems, or usage in connection with your business, if at all.
 
 
+</br>
+
 ## Run modes
+
 disapproved-ads-auditor tool is a python command-line tool that can run in one of the following modes:
 * “Audit Only Mode”- export the relevant ads without deleting them;
 * “Audit + Remove Mode” - export and delete the relevant ads.
@@ -30,6 +38,10 @@ There are a few output files (see here) which are saved locally under the “out
 
 ![Diagram of The tool's functionality](./src/AdsReviewerTool.png)
 
+
+
+</br>
+</br>
 
 ## Selecting the relevant policies
 
@@ -50,33 +62,42 @@ exclusion: [destination] - any ad which has only topics that contains the word "
 ```
 
 
+</br>
+</br>
+
 ## Getting the keys/tokens
 
 Follow the below text, or this [official video](https://www.youtube.com/watch?v=2GWx6jI7Ib4) or [non-official video](https://docs.google.com/presentation/d/1e8PPTTlcBTnwiqUuX3_ll_lgBO3MvgrkGgosj1tf5Lg/edit?usp=sharing)
 
-    1.1. [Get Google Ads Developer Token](https://developers.google.com/google-ads/api/docs/first-call/dev-token). Add developer token id to `google-ads.yaml` file.
+1.1. [Get Google Ads Developer Token](https://developers.google.com/google-ads/api/docs/first-call/dev-token). Add developer token id to `google-ads.yaml` file.
 
-    1.2. [Generate OAuth2 credentials for **desktop application**](https://developers.google.com/adwords/api/docs/guides/authentication#generate_oauth2_credentials)
+
+1.2. [Generate OAuth2 credentials for **desktop application**](https://developers.google.com/adwords/api/docs/guides/authentication#generate_oauth2_credentials)
+
     * Click the download icon next to the credentials that you just created and save file to your computer
-    *  Add client_id and client_secret value to `google-ads.yaml` file
+    
+    * Add client_id and client_secret value to `google-ads.yaml` file
 
-    1.3. Download python source file to perform desktop authentication
+1.3. Download python source file to perform desktop authentication
 
     ```
     curl -0 https://raw.githubusercontent.com/googleads/google-ads-python/868bf36689f1ca4310bdead9c46eed61b8ad1d11/examples/authentication/authenticate_in_desktop_application.py
     ```
 
-    1.4. Run desktop authentication with downloaded credentials file:
+1.4. Run desktop authentication with downloaded credentials file:
     ```
     python authenticate_in_desktop_application.py --client_secrets_path=/path/to/secrets.json
     ```
+    
     * Copy generated refresh token and add it to `google-ads.yaml` file.
 
-    1.5. [Enable Google Ads API in your project](https://developers.google.com/google-ads/api/docs/first-call/oauth-cloud-project#enable_the_in_your_project)
+1.5. [Enable Google Ads API in your project](https://developers.google.com/google-ads/api/docs/first-call/oauth-cloud-project#enable_the_in_your_project)
 
-    1.6. Add login_customer_id and client_customer_id (MMC under which Developer token was generated) to `google-ads.yaml`. **ID should be in 11111111 format, do not add dashes as separator**.
+1.6. Add login_customer_id and client_customer_id (MMC under which Developer token was generated) to `google-ads.yaml`. **ID should be in 11111111 format, do not add dashes as separator**.
 
 
+</br>
+</br>
 
 ## Setup
 
@@ -99,6 +120,8 @@ pip3 install google-ads --upgrade
 ```
 
 
+</br>
+
 ### steps 3-5 are optional: save audit to BQ in addition to local files
 
 3. Install BigQuery API
@@ -117,6 +140,9 @@ export GOOGLE_APPLICATION_CREDENTIALS = <YOUR_SERVICE_ACCOUNT_KEY>
 ```
 
 
+</br>
+</br>
+
 ## Running
 
 1. Run this while `<ACCOUNT_ID>` is the top MCC to run from.
@@ -124,31 +150,38 @@ export GOOGLE_APPLICATION_CREDENTIALS = <YOUR_SERVICE_ACCOUNT_KEY>
 ```shell
 python3 main.py -id <ACCOUNT_ID>
 ```
+</br>
 
-##### How to fill `google-ads.yaml` \ `login_customer_id:` field
+### Tip: How to fill `login_customer_id:` field in `google-ads.yaml`
+
 A. If `<ACCOUNT_ID>` is an MCC, it should appear in this field.
+
 B. If `<ACCOUNT_ID>` is a single-account, its parent MCC should appear this field.
 
-
+</br>
 
 ### Flags
 ```shell
 python3 main.py -id <ACCOUNT_ID> -rm
 ```
 * `-rm`   | `--remove_ads`  - Audits and removes the ads.
+</br>
 
 ##### Less common flags (if uploading to BQ)
-* `-seq`  | `--sequential`   - Runs in sequential mode.
 * `-bq`   | `--write_to_bq` - Audits in BQ in addition to local file.
 * `-ddb`  | `--delete_db`   - Deletes the BQ tables which are relevant to the tool.
 * `-clean_bq` | `--clean_outdated_bq`  -Deletes outdated rows in BQ.
 
+</br>
 
 #### Python reminder
+
 - Redirect tool's output to file:
   ```shell
   python3 main.py > logFile
   ```
+
+</br>
 
 ## Output schemas (CSV in local files / tables on BQ)
 
@@ -156,8 +189,10 @@ python3 main.py -id <ACCOUNT_ID> -rm
 - Under BQ dataset "disapproved-ads-auditor" (optional).
 
 
+</br>
+
  ### "AllAccounts"
- lists all the subMCC and sub accounts that were scanned
+ Lists all the subMCC and sub accounts that were scanned
 
 [![all accounts][1]][1]
 
@@ -167,9 +202,10 @@ timestamp: when scanning all the sub accounts finished.
 session_id: identifies the last run and join with other tables.
 
 
+</br>
 
  ### "AdsToRemove" 
- list all the ads to be removed *including* all the data required for re-uploading the ads (if they were removed).
+ Lists all the ads to be removed *including* all the data required for re-uploading the ads (if they were removed).
 
 [![Ads to remove][4]][4]
 
@@ -190,20 +226,10 @@ session_id: identifies the last run and join with other tables.
 - removal_error: Google server error in case `audited_status = FAILED_TO_REMOVE`
 
 
-
- ### "PerAccountSummary" 
- when finished processing an account, it sums the numbers of ads to be removed, ads that have been removed.
-
-[![per mcc summary][3]][3]
-
-- account_id
-- ads_to_remove_count: total # of ads to remove.
-- timestamp: when scan for this account ended.
-- session_id: identifies the last run and join with other tables.
-
+</br>
 
  ### "PerMccSummary" 
- similar sums per top-MCC level
+ Sums per top-MCC level. Accomulate all the data of the next 'perAccountSammry'
 
 
 [![per account][2]][2]
@@ -215,6 +241,21 @@ session_id: identifies the last run and join with other tables.
 - session_id: identifies the last run and join with other tables.
 
 
+</br>
+
+ ### "PerAccountSummary" 
+ When finished processing an account, it sums the numbers of ads to be removed, ads that have been removed.
+
+[![per mcc summary][3]][3]
+
+- account_id
+- ads_to_remove_count: total # of ads to remove.
+- timestamp: when scan for this account ended.
+- session_id: identifies the last run and join with other tables.
+
+
+</br>
+
  ## Example for relevant SQL queries (using session id for joinning fields)
 [SQL query](src/sql/Report.sql)
 
@@ -224,6 +265,8 @@ session_id: identifies the last run and join with other tables.
  * The code does 3 retries if it crashes.
  * Google BQ API allows a built-in retry mechanism (see [BQ query API](https://googleapis.dev/python/bigquery/latest/generated/google.cloud.bigquery.client.Client.html#google.cloud.bigquery.client.Client.query))
 
+
+</br>
 
  ## Troubleshooting
 
@@ -248,6 +291,8 @@ gle-ads/api/docs/concepts/call-structure#cid".
 
 * Solution: make sure `login_customer_id :` in the yaml file contains the relevant `MCC id`.
 
+
+</br>
 
 ## License
 Apache Version 2.0

@@ -36,7 +36,7 @@ disapproved-ads-auditor tool is a python command-line tool that can run in one o
 There are a few output files (see here) which are saved locally under the “output” folder and optionally on BigQuery as well (“dissaproved_ads_auditor” dataset).
 
 
-![Diagram of The tool's functionality](./src/AdsReviewerTool.png)
+![Diagram of The tool's functionality](/docs/diagram.png)
 
 
 
@@ -207,7 +207,7 @@ session_id: identifies the last run and join with other tables.
  ### "AdsToRemove" 
  Lists all the ads to be removed *including* all the data required for re-uploading the ads (if they were removed).
 
-[![Ads to remove][4]][4]
+[![Ads to remove][2]][2]
 
  Based on [Google Ads ad_group_ad report](https://developers.google.com/google-ads/api/fields/v8/ad_group_ad#ad_group_ad.ad.final_urls)
 - ad_id
@@ -231,8 +231,7 @@ session_id: identifies the last run and join with other tables.
  ### "PerMccSummary" 
  Sums per top-MCC level. Accomulate all the data of the next 'perAccountSammry'
 
-
-[![per account][2]][2]
+[![per mcc summary][3]][3]
 
 - account_id
 - total_sub_accounts: total # of sub accounts.
@@ -246,7 +245,8 @@ session_id: identifies the last run and join with other tables.
  ### "PerAccountSummary" 
  When finished processing an account, it sums the numbers of ads to be removed, ads that have been removed.
 
-[![per mcc summary][3]][3]
+[![per account][4]][4]
+
 
 - account_id
 - ads_to_remove_count: total # of ads to remove.
@@ -298,10 +298,7 @@ gle-ads/api/docs/concepts/call-structure#cid".
 Apache Version 2.0
 See [LICENSE](LICENSE)
 
-
-  [1]: https://i.stack.imgur.com/9osCD.png
-  [2]: https://i.stack.imgur.com/TdaxX.png
-  [3]: https://i.stack.imgur.com/vHRrA.png
-  [4]: https://i.stack.imgur.com/zistH.png
-  [5]: https://i.stack.imgur.com/rZltv.png
-  [6]: https://i.stack.imgur.com/Ip7EO.png
+  [1]: docs/AllAccountsTable.png
+  [2]: docs/AllAdsToRemove.png
+  [3]: docs/PerMccSummaryTable.png
+  [4]: docs/PerAccountSummaryTable

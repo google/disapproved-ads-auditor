@@ -36,7 +36,7 @@ disapproved-ads-auditor tool is a python command-line tool that can run in one o
 There are a few output files (see here) which are saved locally under the “output” folder and optionally on BigQuery as well (“dissaproved_ads_auditor” dataset).
 
 
-![Diagram of The tool's functionality](/docs/diagram.png)
+![Diagram of The tool's functionality](/src/AdsReviewerTool.png)
 
 
 

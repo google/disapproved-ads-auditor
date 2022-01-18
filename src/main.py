@@ -186,7 +186,7 @@ def remove_disapproved_ads_for_account(account):
             ad = ad_group_ad.ad
             policy_summary = ad_group_ad.policy_summary
             current_topics = [entry.topic.lower() for entry in policy_summary.policy_topic_entries]
-            if has_included_topic(current_topics, _INCLIDED_TOPICS_SUBSTRINGS,
+            if has_included_topic(current_topics, _INCLUDED_TOPICS_SUBSTRINGS,
                                   _EXCLUDED_TOPICS_SUBSTRINGS):
                 ads_to_remove_count += 1
                 print('** A suspension topic, will be removed')
